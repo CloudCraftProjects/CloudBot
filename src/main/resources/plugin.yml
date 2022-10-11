@@ -4,4 +4,6 @@ author: booky10
 version: ${version}
 api-version: 1.19
 load: POSTWORLD
-libraries: [ com.discord4j:discord4j-core:3.2.3 ]
+libraries:
+  - org.spongepowered:configurate-yaml:4.1.2
+  - com.discord4j:discord4j-core:3.2.3
