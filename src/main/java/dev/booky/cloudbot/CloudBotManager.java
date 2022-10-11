@@ -1,6 +1,7 @@
 package dev.booky.cloudbot;
 // Created by booky10 in CloudBot (16:04 10.10.22)
 
+import dev.booky.cloudbot.i18n.TranslationManager;
 import dev.booky.cloudbot.storage.CloudBotConfig;
 import dev.booky.cloudbot.storage.CloudBotStorage;
 import dev.booky.cloudbot.storage.ConfigLoader;
@@ -53,6 +54,8 @@ public class CloudBotManager {
             .append(Component.space()).build();
 
     private final Plugin plugin;
+
+    private TranslationManager i18n;
     private GatewayDiscordClient gateway;
 
     private CloudBotStorage storage;
@@ -63,7 +66,9 @@ public class CloudBotManager {
     private final Path configPath;
 
     public CloudBotManager(Plugin plugin, Path configDir) {
+        this.i18n = new TranslationManager(plugin);
         this.plugin = plugin;
+
         this.configPath = configDir.resolve("config.yml");
         this.storagePath = configDir.resolve("storage.json");
     }
@@ -85,6 +90,7 @@ public class CloudBotManager {
     public void reloadStorages() {
         this.config = ConfigLoader.loadObject(this.configPath, CloudBotConfig.class, FileType.YAML);
         this.storage = ConfigLoader.loadObject(this.storagePath, CloudBotStorage.class, FileType.JSON);
+        this.i18n.reload();
     }
 
     public void saveStorages() {
@@ -147,17 +153,17 @@ public class CloudBotManager {
 
                         this.updateStorage(storage -> storage.getWhitelist().put(profile.getUniqueId(), user.getId().asLong()));
                         yield event.reply().withEmbeds(EmbedCreateSpec.builder()
-                                .color(Color.GREEN).title("Player whitelisted")
-                                .description(user.getMention() + " has added `" + username + "` to the whitelist.")
+                                .color(Color.GREEN).title(this.i18n.translate("command.whitelist.success.title", event))
+                                .description(this.i18n.translate("command.whitelist.success.description", event, user.getMention(), profile.getUsername()))
                                 .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
                                 .thumbnail("https://crafthead.net/helm/" + profile.getUniqueId() + "/128")
                                 .build());
                     } catch (Throwable throwable) {
                         throwable.printStackTrace();
-                        yield event.reply("<a:alert:785547764389117983> Error: `" + throwable + "`");
+                        yield event.reply(this.i18n.translate("command.whitelist.error", event, throwable));
                     }
                 }
-                default -> event.reply("404 <a:help:770734169344442378>").withEphemeral(true);
+                default -> event.reply(this.i18n.translate("command.not-found", event)).withEphemeral(true);
             });
         });
 
