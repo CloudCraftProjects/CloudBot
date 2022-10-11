@@ -3,21 +3,21 @@ package dev.booky.cloudbot.storage;
 
 import org.spongepowered.configurate.objectmapping.ConfigSerializable;
 
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @SuppressWarnings("FieldMayBeFinal") // configurate
 @ConfigSerializable
 public class CloudBotStorage {
 
-    private Set<UUID> whitelist = new LinkedHashSet<>();
+    private Map<UUID, Long> whitelist = new LinkedHashMap<>();
 
     @SuppressWarnings("unused") // configurate
     private CloudBotStorage() {
     }
 
-    public Set<UUID> getWhitelist() {
+    public Map<UUID, Long> getWhitelist() {
         return whitelist;
     }
 }

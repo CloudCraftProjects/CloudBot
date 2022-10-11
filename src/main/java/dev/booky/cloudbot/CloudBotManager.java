@@ -6,6 +6,7 @@ import dev.booky.cloudbot.storage.CloudBotStorage;
 import dev.booky.cloudbot.storage.ConfigLoader;
 import dev.booky.cloudbot.storage.ConfigLoader.FileType;
 import dev.booky.cloudbot.util.McApiUtil;
+import dev.booky.cloudbot.util.McApiUtil.McProfile;
 import discord4j.core.DiscordClient;
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
@@ -13,10 +14,15 @@ import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.command.ApplicationCommandInteractionOption;
 import discord4j.core.object.command.ApplicationCommandInteractionOptionValue;
 import discord4j.core.object.command.ApplicationCommandOption;
+import discord4j.core.object.entity.Member;
+import discord4j.core.object.entity.User;
+import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.gateway.intent.IntentSet;
 import discord4j.rest.util.AllowedMentions;
+import discord4j.rest.util.Color;
+import discord4j.rest.util.Permission;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -25,9 +31,9 @@ import org.bukkit.plugin.Plugin;
 import reactor.core.publisher.Mono;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 public class CloudBotManager {
@@ -120,13 +126,35 @@ public class CloudBotManager {
                             .flatMap(ApplicationCommandInteractionOption::getValue)
                             .map(ApplicationCommandInteractionOptionValue::asString)
                             .orElseThrow();
+                    User user = event.getInteraction().getUser();
 
                     try {
-                        UUID uniqueId = McApiUtil.getUniqueId(username);
-                        yield event.reply("'" + username + "' -> " + uniqueId);
+                        McProfile profile = McApiUtil.loadProfile(username);
+                        if (this.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
+                            throw new IllegalArgumentException(profile + " is already whitelisted");
+                        }
+                        if (this.getStorage().getWhitelist().containsValue(user.getId().asLong())) {
+                            boolean bypass = event.getInteraction().getGuildId()
+                                    .map(user::asMember).flatMap(Mono::blockOptional)
+                                    .map(Member::getBasePermissions).flatMap(Mono::blockOptional)
+                                    .map(set -> set.contains(Permission.MANAGE_MESSAGES))
+                                    .orElse(false);
+
+                            if (!bypass) {
+                                throw new IllegalArgumentException(user.getTag() + " has already whitelisted someone");
+                            }
+                        }
+
+                        this.updateStorage(storage -> storage.getWhitelist().put(profile.getUniqueId(), user.getId().asLong()));
+                        yield event.reply().withEmbeds(EmbedCreateSpec.builder()
+                                .color(Color.GREEN).title("Player whitelisted")
+                                .description(user.getMention() + " has added `" + username + "` to the whitelist.")
+                                .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
+                                .thumbnail("https://crafthead.net/helm/" + profile.getUniqueId() + "/128")
+                                .build());
                     } catch (Throwable throwable) {
                         throwable.printStackTrace();
-                        yield event.reply("<a:alert:785547764389117983> Error: `" + throwable + "`").withEphemeral(true);
+                        yield event.reply("<a:alert:785547764389117983> Error: `" + throwable + "`");
                     }
                 }
                 default -> event.reply("404 <a:help:770734169344442378>").withEphemeral(true);
