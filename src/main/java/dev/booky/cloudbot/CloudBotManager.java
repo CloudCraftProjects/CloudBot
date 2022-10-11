@@ -3,10 +3,16 @@ package dev.booky.cloudbot;
 
 import dev.booky.cloudbot.config.ConfigLoader;
 import dev.booky.cloudbot.util.CloudBotConfig;
+import dev.booky.cloudbot.util.McApiUtil;
 import discord4j.core.DiscordClient;
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
+import discord4j.core.object.command.ApplicationCommandInteractionOption;
+import discord4j.core.object.command.ApplicationCommandInteractionOptionValue;
+import discord4j.core.object.command.ApplicationCommandOption;
+import discord4j.discordjson.json.ApplicationCommandOptionData;
+import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.gateway.intent.IntentSet;
 import discord4j.rest.util.AllowedMentions;
 import net.kyori.adventure.text.Component;
@@ -17,7 +23,9 @@ import org.bukkit.plugin.Plugin;
 import reactor.core.publisher.Mono;
 
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 public class CloudBotManager {
 
@@ -63,10 +71,44 @@ public class CloudBotManager {
                 .setDefaultAllowedMentions(AllowedMentions.suppressAll())
                 .build();
 
+        ApplicationCommandRequest whitelistCommand = ApplicationCommandRequest.builder()
+                .name("whitelist")
+                .description("Whitelists you on the Minecraft Server")
+                .descriptionLocalizationsOrNull(Map.of("de", "Whitelisted dich auf dem Minecraft Server"))
+                .addOption(ApplicationCommandOptionData.builder()
+                        .name("username")
+                        .nameLocalizationsOrNull(Map.of("de", "nutzername"))
+                        .description("Your Minecraft ingame name")
+                        .descriptionLocalizationsOrNull(Map.of("de", "Dein Minecraft Ingame-Name"))
+                        .type(ApplicationCommandOption.Type.STRING.getValue())
+                        .minLength(3).maxLength(16)
+                        .required(true)
+                        .build())
+                .build();
+
         Mono<Void> login = client.gateway().setEnabledIntents(IntentSet.none()).withGateway(gateway -> {
             this.gateway = gateway;
 
+            long appId = gateway.getRestClient().getApplicationId().blockOptional().orElseThrow();
+            gateway.getRestClient().getApplicationService()
+                    .createGuildApplicationCommand(appId, 737751273163718668L, whitelistCommand)
+                    .block();
+
             return gateway.on(ChatInputInteractionEvent.class, event -> switch (event.getCommandName()) {
+                case "whitelist" -> {
+                    String username = event.getOption("username")
+                            .flatMap(ApplicationCommandInteractionOption::getValue)
+                            .map(ApplicationCommandInteractionOptionValue::asString)
+                            .orElseThrow();
+
+                    try {
+                        UUID uniqueId = McApiUtil.getUniqueId(username);
+                        yield event.reply("'" + username + "' -> " + uniqueId);
+                    } catch (Throwable throwable) {
+                        throwable.printStackTrace();
+                        yield event.reply("<a:alert:785547764389117983> Error: `" + throwable + "`").withEphemeral(true);
+                    }
+                }
                 default -> event.reply("404 <a:help:770734169344442378>").withEphemeral(true);
             });
         });
