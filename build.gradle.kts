@@ -18,6 +18,7 @@ dependencies {
     compileOnlyApi("io.papermc.paper:paper-api:1.19.2-R0.1-SNAPSHOT")
 
     // Provided using library api
+    compileOnlyApi("org.spongepowered:configurate-gson:4.1.2")
     compileOnlyApi("org.spongepowered:configurate-yaml:4.1.2")
     compileOnlyApi("com.discord4j:discord4j-core:3.2.3")
 

@@ -1,8 +1,10 @@
 package dev.booky.cloudbot;
 // Created by booky10 in CloudBot (16:04 10.10.22)
 
-import dev.booky.cloudbot.config.ConfigLoader;
-import dev.booky.cloudbot.util.CloudBotConfig;
+import dev.booky.cloudbot.storage.CloudBotConfig;
+import dev.booky.cloudbot.storage.CloudBotStorage;
+import dev.booky.cloudbot.storage.ConfigLoader;
+import dev.booky.cloudbot.storage.ConfigLoader.FileType;
 import dev.booky.cloudbot.util.McApiUtil;
 import discord4j.core.DiscordClient;
 import discord4j.core.DiscordClientBuilder;
@@ -26,6 +28,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 public class CloudBotManager {
 
@@ -44,26 +47,43 @@ public class CloudBotManager {
             .append(Component.space()).build();
 
     private final Plugin plugin;
-    private final Path configPath;
-
     private GatewayDiscordClient gateway;
+
+    private CloudBotStorage storage;
     private CloudBotConfig config;
+    private boolean isDirty = false;
+
+    private final Path storagePath;
+    private final Path configPath;
 
     public CloudBotManager(Plugin plugin, Path configDir) {
         this.plugin = plugin;
         this.configPath = configDir.resolve("config.yml");
+        this.storagePath = configDir.resolve("storage.json");
     }
 
     public static Component getPrefix() {
         return PREFIX;
     }
 
-    public void reloadConfig() {
-        this.config = ConfigLoader.loadObject(this.configPath, CloudBotConfig.class);
+    public void updateConfig(Consumer<CloudBotConfig> consumer) {
+        consumer.accept(this.getConfig());
+        this.isDirty = true;
     }
 
-    public void saveConfig() {
-        ConfigLoader.saveObject(this.configPath, this.getConfig());
+    public void updateStorage(Consumer<CloudBotStorage> consumer) {
+        consumer.accept(this.getStorage());
+        this.isDirty = true;
+    }
+
+    public void reloadStorages() {
+        this.config = ConfigLoader.loadObject(this.configPath, CloudBotConfig.class, FileType.YAML);
+        this.storage = ConfigLoader.loadObject(this.storagePath, CloudBotStorage.class, FileType.JSON);
+    }
+
+    public void saveStorages() {
+        ConfigLoader.saveObject(this.configPath, this.getConfig(), FileType.YAML);
+        ConfigLoader.saveObject(this.storagePath, this.getStorage(), FileType.JSON);
     }
 
     public void startBot() {
@@ -120,7 +140,16 @@ public class CloudBotManager {
         return Objects.requireNonNull(this.config, "Config has not been loaded yet");
     }
 
+
+    public CloudBotStorage getStorage() {
+        return Objects.requireNonNull(this.storage, "Storage has not been loaded yet");
+    }
+
     public Plugin getPlugin() {
         return plugin;
+    }
+
+    public boolean isDirty() {
+        return isDirty;
     }
 }

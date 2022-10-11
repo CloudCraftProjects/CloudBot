@@ -1,8 +1,9 @@
-package dev.booky.cloudbot.util;
+package dev.booky.cloudbot.storage;
 // Created by booky10 in CloudBot (16:08 10.10.22)
 
 import org.spongepowered.configurate.objectmapping.ConfigSerializable;
 
+@SuppressWarnings("FieldMayBeFinal") // configurate
 @ConfigSerializable
 public class CloudBotConfig {
 
