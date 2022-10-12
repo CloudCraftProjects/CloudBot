@@ -1,30 +1,23 @@
 package dev.booky.cloudbot;
 // Created by booky10 in CloudBot (16:04 10.10.22)
 
+import dev.booky.cloudbot.commands.BotCommand;
+import dev.booky.cloudbot.commands.WhitelistCommand;
+import dev.booky.cloudbot.commands.WhitelistRemoveCommand;
 import dev.booky.cloudbot.i18n.TranslationManager;
+import dev.booky.cloudbot.i18n.Translator;
 import dev.booky.cloudbot.storage.CloudBotConfig;
 import dev.booky.cloudbot.storage.CloudBotStorage;
 import dev.booky.cloudbot.storage.ConfigLoader;
 import dev.booky.cloudbot.storage.ConfigLoader.FileType;
-import dev.booky.cloudbot.util.McApiUtil;
-import dev.booky.cloudbot.util.McApiUtil.McProfile;
 import discord4j.core.DiscordClient;
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
-import discord4j.core.object.command.ApplicationCommandInteractionOption;
-import discord4j.core.object.command.ApplicationCommandInteractionOptionValue;
-import discord4j.core.object.command.ApplicationCommandOption;
-import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.User;
-import discord4j.core.spec.EmbedCreateSpec;
-import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.gateway.intent.IntentSet;
 import discord4j.rest.util.AllowedMentions;
-import discord4j.rest.util.Color;
-import discord4j.rest.util.Permission;
-import discord4j.rest.util.PermissionSet;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -33,13 +26,10 @@ import org.bukkit.plugin.Plugin;
 import reactor.core.publisher.Mono;
 
 import java.nio.file.Path;
-import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 public class CloudBotManager {
@@ -58,7 +48,6 @@ public class CloudBotManager {
             .append(Component.text(']', NamedTextColor.GRAY))
             .append(Component.space()).build();
 
-    private final ReentrantLock whitelistListLock = new ReentrantLock();
     private final Plugin plugin;
 
     private final TranslationManager i18n;
@@ -109,160 +98,33 @@ public class CloudBotManager {
                 .setDefaultAllowedMentions(AllowedMentions.suppressAll())
                 .build();
 
-        ApplicationCommandRequest whitelistRemoveCommand = ApplicationCommandRequest.builder()
-                .name("whitelist-remove")
-                .description("Remove someone from the whitelist of the minecraft server")
-                .descriptionLocalizationsOrNull(Map.of("de", "Entfernt jemanden von der Whitelist des Minecraft Servers"))
-                .defaultMemberPermissions(Long.toString(PermissionSet.of(Permission.MANAGE_MESSAGES).getRawValue()))
-                .dmPermission(false)
-                .addOption(ApplicationCommandOptionData.builder()
-                        .name("username")
-                        .nameLocalizationsOrNull(Map.of("de", "nutzername"))
-                        .description("The ingame name of the player")
-                        .descriptionLocalizationsOrNull(Map.of("de", "Der Minecraft Ingame-Nutzername"))
-                        .type(ApplicationCommandOption.Type.STRING.getValue())
-                        .minLength(3).maxLength(16)
-                        .required(true)
-                        .build())
-                .build();
-
-        ApplicationCommandRequest whitelistCommand = ApplicationCommandRequest.builder()
-                .name("whitelist")
-                .description("Access and modify the whitelist on the minecraft server")
-                .descriptionLocalizationsOrNull(Map.of("de", "Lässt dich auf die Whitelist des Minecraft Servers zugreifen und bearbeiten"))
-                .dmPermission(false)
-                .addOption(ApplicationCommandOptionData.builder()
-                        .name("add")
-                        .description("Whitelists you on the minecraft server")
-                        .descriptionLocalizationsOrNull(Map.of("de", "Whitelisted dich auf dem Minecraft Server"))
-                        .type(ApplicationCommandOption.Type.SUB_COMMAND.getValue())
-                        .addOption(ApplicationCommandOptionData.builder()
-                                .name("username")
-                                .nameLocalizationsOrNull(Map.of("de", "nutzername"))
-                                .description("Your minecraft ingame name")
-                                .descriptionLocalizationsOrNull(Map.of("de", "Dein Minecraft Ingame-Nutzername"))
-                                .type(ApplicationCommandOption.Type.STRING.getValue())
-                                .minLength(3).maxLength(16)
-                                .required(true)
-                                .build())
-                        .build())
-                .addOption(ApplicationCommandOptionData.builder()
-                        .name("list")
-                        .description("Lists all currently whitelisted players")
-                        .descriptionLocalizationsOrNull(Map.of("de", "Listet alle Spieler auf, die sich auf der Whitelist befinden"))
-                        .type(ApplicationCommandOption.Type.SUB_COMMAND.getValue())
-                        .build())
-                .build();
-
+        Set<BotCommand> commands = Set.of(
+                new WhitelistCommand(),
+                new WhitelistRemoveCommand());
 
         Mono<Void> login = client.gateway().setEnabledIntents(IntentSet.none()).withGateway(gateway -> {
             this.gateway = gateway;
 
             long appId = gateway.getRestClient().getApplicationId().blockOptional().orElseThrow();
-            gateway.getRestClient().getApplicationService().createGlobalApplicationCommand(appId, whitelistCommand).block();
-            gateway.getRestClient().getApplicationService().createGlobalApplicationCommand(appId, whitelistRemoveCommand).block();
+            Map<String, BotCommand> commandMap = new HashMap<>(commands.size());
+            for (BotCommand command : commands) {
+                ApplicationCommandRequest req = command.provideCommandData();
+                commandMap.put(req.name(), command);
 
-            return gateway.on(ChatInputInteractionEvent.class, event -> switch (event.getCommandName()) {
-                case "whitelist-remove" -> {
-                    String username = event.getOption("username")
-                            .flatMap(ApplicationCommandInteractionOption::getValue)
-                            .map(ApplicationCommandInteractionOptionValue::asString)
-                            .orElseThrow();
-                    McProfile profile = McApiUtil.loadProfile(username);
-                    if (!this.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
-                        yield event.reply(this.i18n.translate("command.whitelist-remove.not-whitelisted", event)).withEphemeral(true);
-                    }
+                gateway.getRestClient().getApplicationService()
+                        .createGlobalApplicationCommand(appId, req).block();
+            }
 
-                    this.updateStorage(storage -> storage.getWhitelist().remove(profile.getUniqueId()));
-                    yield event.reply(this.i18n.translate("command.whitelist-remove.success", event)).withEphemeral(true);
+            return gateway.on(ChatInputInteractionEvent.class, event -> {
+                BotCommand command = commandMap.get(event.getCommandName());
+                if (command == null) {
+                    return event.reply(this.i18n.translate("command.not-found", event)).withEphemeral(true);
                 }
-                case "whitelist" -> {
-                    if (event.getOption("list").isPresent()) {
-                        event.deferReply().withEphemeral(true).subscribe();
-                        whitelistListLock.lock();
 
-                        try {
-                            StringBuilder builder = new StringBuilder();
-                            Set<UUID> playerIds = this.getStorage().getWhitelist().keySet();
+                Translator translator = (key, args) -> this.i18n.translate(key, event, args);
+                User user = event.getInteraction().getUser();
 
-                            try {
-                                for (UUID playerId : playerIds) {
-                                    if (!builder.isEmpty()) {
-                                        builder.append(", ");
-                                    }
-
-                                    String name = McApiUtil.loadProfile(playerId).getUsername();
-                                    if (name != null) {
-                                        name = name.replace("_", "\\_");
-                                    } else {
-                                        name = playerId.toString().substring(0, 8);
-                                    }
-
-                                    builder.append(name);
-                                }
-
-                                if (builder.length() > 4096) {
-                                    String tooManyStr = "... \n> **" + this.i18n.translate("command.whitelist.list.too-many-players", event, builder.length()) + "**";
-                                    builder.delete(4096 - tooManyStr.length(), builder.length()).append(tooManyStr);
-                                }
-                            } catch (Throwable throwable) {
-                                throwable.printStackTrace();
-                                builder.append(this.i18n.translate("command.whitelist.list.error", event, throwable));
-                            }
-
-                            yield event.createFollowup()
-                                    .withEmbeds(EmbedCreateSpec.builder()
-                                            .title(this.i18n.translate("command.whitelist.list.success", event, playerIds.size()))
-                                            .description(builder.toString())
-                                            .color(Color.CYAN).build())
-                                    .then();
-                        } finally {
-                            whitelistListLock.unlock();
-                        }
-                    }
-
-                    Optional<ApplicationCommandInteractionOption> addOption = event.getOption("add");
-                    if (addOption.isEmpty()) {
-                        throw new IllegalStateException("Neither list, nor add options are supplied");
-                    }
-
-                    String username = addOption
-                            .flatMap(opt -> opt.getOption("username"))
-                            .flatMap(ApplicationCommandInteractionOption::getValue)
-                            .map(ApplicationCommandInteractionOptionValue::asString)
-                            .orElseThrow();
-                    User user = event.getInteraction().getUser();
-
-                    try {
-                        McProfile profile = McApiUtil.loadProfile(username);
-                        if (this.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
-                            throw new IllegalArgumentException(profile + " is already whitelisted");
-                        }
-                        if (this.getStorage().getWhitelist().containsValue(user.getId().asLong())) {
-                            boolean bypass = event.getInteraction().getGuildId()
-                                    .map(user::asMember).flatMap(Mono::blockOptional)
-                                    .map(Member::getBasePermissions).flatMap(Mono::blockOptional)
-                                    .map(set -> set.contains(Permission.MANAGE_MESSAGES))
-                                    .orElse(false);
-
-                            if (!bypass) {
-                                throw new IllegalArgumentException(user.getTag() + " has already whitelisted someone");
-                            }
-                        }
-
-                        this.updateStorage(storage -> storage.getWhitelist().put(profile.getUniqueId(), user.getId().asLong()));
-                        yield event.reply().withEmbeds(EmbedCreateSpec.builder()
-                                .color(Color.GREEN).title(this.i18n.translate("command.whitelist.add.success.title", event))
-                                .description(this.i18n.translate("command.whitelist.add.success.description", event, user.getMention(), profile.getUsername()))
-                                .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
-                                .thumbnail("https://crafthead.net/helm/" + profile.getUniqueId() + "/128")
-                                .build());
-                    } catch (Throwable throwable) {
-                        throwable.printStackTrace();
-                        yield event.reply(this.i18n.translate("command.whitelist.add.error", event, throwable));
-                    }
-                }
-                default -> event.reply(this.i18n.translate("command.not-found", event)).withEphemeral(true);
+                return command.run(this, event.getCommandName(), event, user, translator);
             });
         });
 
