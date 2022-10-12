@@ -30,5 +30,6 @@ public class CloudBotMain extends JavaPlugin {
     @Override
     public void onDisable() {
         this.manager.saveStorages();
+        this.manager.shutdownBot();
     }
 }

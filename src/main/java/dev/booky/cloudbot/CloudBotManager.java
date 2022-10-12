@@ -170,6 +170,12 @@ public class CloudBotManager {
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> login.block());
     }
 
+    public void shutdownBot() {
+        if (this.gateway != null) {
+            this.gateway.logout().block();
+        }
+    }
+
     public CloudBotConfig getConfig() {
         return Objects.requireNonNull(this.config, "Config has not been loaded yet");
     }
