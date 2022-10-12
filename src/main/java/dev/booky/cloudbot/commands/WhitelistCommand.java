@@ -3,6 +3,7 @@ package dev.booky.cloudbot.commands;
 
 import dev.booky.cloudbot.CloudBotManager;
 import dev.booky.cloudbot.i18n.Translator;
+import dev.booky.cloudbot.util.MarkdownEscape;
 import dev.booky.cloudbot.util.McApiUtil;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.command.ApplicationCommandInteractionOption;
@@ -78,7 +79,7 @@ public class WhitelistCommand implements BotCommand {
 
                             String name = McApiUtil.loadProfile(playerId).getUsername();
                             if (name != null) {
-                                name = name.replace("_", "\\_");
+                                name = MarkdownEscape.escape(name);
                             } else {
                                 name = playerId.toString().substring(0, 8);
                             }
@@ -92,7 +93,7 @@ public class WhitelistCommand implements BotCommand {
                         }
                     } catch (Throwable throwable) {
                         throwable.printStackTrace();
-                        builder.append(i18n.apply("command.whitelist.list.error", throwable));
+                        builder.append(i18n.apply("command.whitelist.list.error", MarkdownEscape.escape(throwable.toString())));
                     }
 
                     event.createFollowup()
@@ -110,7 +111,7 @@ public class WhitelistCommand implements BotCommand {
 
         Optional<ApplicationCommandInteractionOption> addOption = event.getOption("add");
         if (addOption.isEmpty()) {
-            throw new IllegalStateException("Neither list, nor add options are supplied");
+            throw new IllegalStateException("Neither list, nor add option are supplied");
         }
 
         String username = addOption
@@ -122,7 +123,8 @@ public class WhitelistCommand implements BotCommand {
         try {
             McApiUtil.McProfile profile = McApiUtil.loadProfile(username);
             if (manager.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
-                throw new IllegalArgumentException(profile + " is already whitelisted");
+                return event.reply(i18n.apply("command.whitelist.add.error.mc-already-whitelisted",
+                        MarkdownEscape.escape(profile.getUsername())));
             }
             if (manager.getStorage().getWhitelist().containsValue(user.getId().asLong())) {
                 boolean bypass = event.getInteraction().getGuildId()
@@ -132,20 +134,22 @@ public class WhitelistCommand implements BotCommand {
                         .orElse(false);
 
                 if (!bypass) {
-                    throw new IllegalArgumentException(user.getTag() + " has already whitelisted someone");
+                    return event.reply(i18n.apply("command.whitelist.add.error.dc-already-whitelisted"));
                 }
             }
 
             manager.updateStorage(storage -> storage.getWhitelist().put(profile.getUniqueId(), user.getId().asLong()));
             return event.reply().withEmbeds(EmbedCreateSpec.builder()
                     .color(Color.GREEN).title(i18n.apply("command.whitelist.add.success.title"))
-                    .description(i18n.apply("command.whitelist.add.success.description", user.getMention(), profile.getUsername()))
-                    .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
+                    .description(i18n.apply("command.whitelist.add.success.description",
+                            user.getMention(), MarkdownEscape.escape(profile.getUsername())))
+                    .footer(MarkdownEscape.escape(user.getTag()), user.getAvatarUrl())
                     .thumbnail("https://crafthead.net/helm/" + profile.getUniqueId() + "/128")
+                    .timestamp(Instant.now())
                     .build());
         } catch (Throwable throwable) {
             throwable.printStackTrace();
-            return event.reply(i18n.apply("command.whitelist.add.error", throwable));
+            return event.reply(i18n.apply("command.whitelist.add.error.general", throwable));
         }
     }
 }

@@ -7,20 +7,15 @@ import discord4j.core.object.command.ApplicationCommandInteractionOption;
 import discord4j.core.object.command.ApplicationCommandInteractionOptionValue;
 
 import java.util.Collection;
-import java.util.regex.Pattern;
 
 public final class CommandStringifier {
 
-    private static final Pattern MD_ESCAPE = Pattern.compile("([_*~`>])");
-
     public static String stringify(ChatInputInteractionEvent event) {
-        StringBuilder builder = new StringBuilder("`/" + event.getCommandName());
-        stringify0(builder, event.getOptions());
-        return builder.append("`").toString();
-    }
+        StringBuilder builder = new StringBuilder("`/");
+        builder.append(MarkdownEscape.escape(event.getCommandName()));
 
-    private static String escapeMarkdown(String string) {
-        return MD_ESCAPE.matcher(string).replaceAll("\\\\$1");
+        stringify0(builder, event.getOptions());
+        return builder.append('`').toString();
     }
 
     private static void stringify0(StringBuilder builder, Collection<ApplicationCommandInteractionOption> options) {
@@ -31,35 +26,30 @@ public final class CommandStringifier {
     }
 
     private static void stringify0(StringBuilder builder, ApplicationCommandInteractionOption option) {
+        builder.append(MarkdownEscape.escape(option.getName())).append(':');
         switch (option.getType()) {
             case STRING -> {
                 String value = option.getValue().map(ApplicationCommandInteractionOptionValue::asString).orElse("null");
-                builder.append(option.getName()).append(":'").append(escapeMarkdown(value)).append('\'');
+                builder.append('\'').append(MarkdownEscape.escape(value)).append('\'');
             }
-            case BOOLEAN -> {
-                boolean value = option.getValue().map(ApplicationCommandInteractionOptionValue::asBoolean).orElse(false);
-                builder.append(option.getName()).append(':').append(value);
-            }
-            case NUMBER -> {
-                double value = option.getValue().map(ApplicationCommandInteractionOptionValue::asDouble).orElse(0d);
-                builder.append(option.getName()).append(':').append(value);
-            }
-            case INTEGER -> {
-                long value = option.getValue().map(ApplicationCommandInteractionOptionValue::asLong).orElse(0L);
-                builder.append(option.getName()).append(':').append(value);
-            }
+            case BOOLEAN -> builder.append(option.getValue()
+                    .map(ApplicationCommandInteractionOptionValue::asBoolean)
+                    .orElse(false));
+            case NUMBER -> builder.append(option.getValue()
+                    .map(ApplicationCommandInteractionOptionValue::asDouble)
+                    .orElse(0d));
+            case INTEGER -> builder.append(option.getValue()
+                    .map(ApplicationCommandInteractionOptionValue::asLong)
+                    .orElse(0L));
             case USER, ROLE, CHANNEL, MENTIONABLE -> {
                 String value = option.getValue().map(ApplicationCommandInteractionOptionValue::asSnowflake).map(Snowflake::asString).orElse("null");
-                builder.append(option.getName()).append(':').append(value).append('[').append(option.getType()).append(']');
+                builder.append(value).append('[').append(option.getType()).append(']');
             }
             case SUB_COMMAND, SUB_COMMAND_GROUP -> {
-                builder.append(option.getName());
+                builder.deleteCharAt(builder.length() - 1);
                 stringify0(builder, option.getOptions());
             }
-            default -> {
-                String value = option.getType().name() + "[UNSUPPORTED]";
-                builder.append(option.getName()).append(':').append(value);
-            }
+            default -> builder.append(option.getType().name()).append("[UNSUPPORTED]");
         }
     }
 }

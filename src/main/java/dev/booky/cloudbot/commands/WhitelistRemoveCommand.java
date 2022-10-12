@@ -3,6 +3,7 @@ package dev.booky.cloudbot.commands;
 
 import dev.booky.cloudbot.CloudBotManager;
 import dev.booky.cloudbot.i18n.Translator;
+import dev.booky.cloudbot.util.MarkdownEscape;
 import dev.booky.cloudbot.util.McApiUtil;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.command.ApplicationCommandInteractionOption;
@@ -45,12 +46,15 @@ public class WhitelistRemoveCommand implements BotCommand {
                 .flatMap(ApplicationCommandInteractionOption::getValue)
                 .map(ApplicationCommandInteractionOptionValue::asString)
                 .orElseThrow();
+
         McApiUtil.McProfile profile = McApiUtil.loadProfile(username);
         if (!manager.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
-            return event.reply(i18n.apply("command.whitelist-remove.not-whitelisted")).withEphemeral(true);
+            return event.reply(i18n.apply("command.whitelist-remove.not-whitelisted",
+                    MarkdownEscape.escape(profile.getUsername()))).withEphemeral(true);
         }
 
         manager.updateStorage(storage -> storage.getWhitelist().remove(profile.getUniqueId()));
-        return event.reply(i18n.apply("command.whitelist-remove.success")).withEphemeral(true);
+        return event.reply(i18n.apply("command.whitelist-remove.success",
+                MarkdownEscape.escape(profile.getUsername()))).withEphemeral(true);
     }
 }
