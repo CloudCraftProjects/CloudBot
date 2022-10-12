@@ -35,6 +35,10 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 public class CloudBotManager {
@@ -53,6 +57,7 @@ public class CloudBotManager {
             .append(Component.text(']', NamedTextColor.GRAY))
             .append(Component.space()).build();
 
+    private final ReentrantLock whitelistListLock = new ReentrantLock();
     private final Plugin plugin;
 
     private TranslationManager i18n;
@@ -105,16 +110,28 @@ public class CloudBotManager {
 
         ApplicationCommandRequest whitelistCommand = ApplicationCommandRequest.builder()
                 .name("whitelist")
-                .description("Whitelists you on the Minecraft Server")
-                .descriptionLocalizationsOrNull(Map.of("de", "Whitelisted dich auf dem Minecraft Server"))
+                .description("Access and modify the whitelist on the minecraft server")
+                .descriptionLocalizationsOrNull(Map.of("de", "Lässt dich auf die Whitelist des Minecraft Servers zugreifen und bearbeiten"))
                 .addOption(ApplicationCommandOptionData.builder()
-                        .name("username")
-                        .nameLocalizationsOrNull(Map.of("de", "nutzername"))
-                        .description("Your Minecraft ingame name")
-                        .descriptionLocalizationsOrNull(Map.of("de", "Dein Minecraft Ingame-Name"))
-                        .type(ApplicationCommandOption.Type.STRING.getValue())
-                        .minLength(3).maxLength(16)
-                        .required(true)
+                        .name("add")
+                        .description("Whitelists you on the Minecraft Server")
+                        .descriptionLocalizationsOrNull(Map.of("de", "Whitelisted dich auf dem Minecraft Server"))
+                        .type(ApplicationCommandOption.Type.SUB_COMMAND.getValue())
+                        .addOption(ApplicationCommandOptionData.builder()
+                                .name("username")
+                                .nameLocalizationsOrNull(Map.of("de", "nutzername"))
+                                .description("Your Minecraft ingame name")
+                                .descriptionLocalizationsOrNull(Map.of("de", "Dein Minecraft Ingame-Name"))
+                                .type(ApplicationCommandOption.Type.STRING.getValue())
+                                .minLength(3).maxLength(16)
+                                .required(true)
+                                .build())
+                        .build())
+                .addOption(ApplicationCommandOptionData.builder()
+                        .name("list")
+                        .description("Lists all currently whitelisted players")
+                        .descriptionLocalizationsOrNull(Map.of("de", "Listet alle Spieler auf, die sich auf der Whitelist befinden"))
+                        .type(ApplicationCommandOption.Type.SUB_COMMAND.getValue())
                         .build())
                 .build();
 
@@ -128,7 +145,57 @@ public class CloudBotManager {
 
             return gateway.on(ChatInputInteractionEvent.class, event -> switch (event.getCommandName()) {
                 case "whitelist" -> {
-                    String username = event.getOption("username")
+                    if (event.getOption("list").isPresent()) {
+                        event.deferReply().withEphemeral(true).subscribe();
+                        whitelistListLock.lock();
+
+                        try {
+                            StringBuilder builder = new StringBuilder();
+                            Set<UUID> playerIds = this.getStorage().getWhitelist().keySet();
+
+                            try {
+                                for (UUID playerId : playerIds) {
+                                    if (!builder.isEmpty()) {
+                                        builder.append(", ");
+                                    }
+
+                                    String name = McApiUtil.loadProfile(playerId).getUsername();
+                                    if (name != null) {
+                                        name = name.replace("_", "\\_");
+                                    } else {
+                                        name = playerId.toString().substring(0, 8);
+                                    }
+
+                                    builder.append(name);
+                                }
+
+                                if (builder.length() > 4096) {
+                                    String tooManyStr = "... \n> **" + this.i18n.translate("command.whitelist.list.too-many-players", event, builder.length()) + "**";
+                                    builder.delete(4096 - tooManyStr.length(), builder.length()).append(tooManyStr);
+                                }
+                            } catch (Throwable throwable) {
+                                throwable.printStackTrace();
+                                builder.append(this.i18n.translate("command.whitelist.list.error", event, throwable));
+                            }
+
+                            yield event.createFollowup()
+                                    .withEmbeds(EmbedCreateSpec.builder()
+                                            .title(this.i18n.translate("command.whitelist.list.success", event, playerIds.size()))
+                                            .description(builder.toString())
+                                            .color(Color.CYAN).build())
+                                    .then();
+                        } finally {
+                            whitelistListLock.unlock();
+                        }
+                    }
+
+                    Optional<ApplicationCommandInteractionOption> addOption = event.getOption("add");
+                    if (addOption.isEmpty()) {
+                        throw new IllegalStateException("Neither list, nor add options are supplied");
+                    }
+
+                    String username = addOption
+                            .flatMap(opt -> opt.getOption("username"))
                             .flatMap(ApplicationCommandInteractionOption::getValue)
                             .map(ApplicationCommandInteractionOptionValue::asString)
                             .orElseThrow();
@@ -153,14 +220,14 @@ public class CloudBotManager {
 
                         this.updateStorage(storage -> storage.getWhitelist().put(profile.getUniqueId(), user.getId().asLong()));
                         yield event.reply().withEmbeds(EmbedCreateSpec.builder()
-                                .color(Color.GREEN).title(this.i18n.translate("command.whitelist.success.title", event))
-                                .description(this.i18n.translate("command.whitelist.success.description", event, user.getMention(), profile.getUsername()))
+                                .color(Color.GREEN).title(this.i18n.translate("command.whitelist.add.success.title", event))
+                                .description(this.i18n.translate("command.whitelist.add.success.description", event, user.getMention(), profile.getUsername()))
                                 .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
                                 .thumbnail("https://crafthead.net/helm/" + profile.getUniqueId() + "/128")
                                 .build());
                     } catch (Throwable throwable) {
                         throwable.printStackTrace();
-                        yield event.reply(this.i18n.translate("command.whitelist.error", event, throwable));
+                        yield event.reply(this.i18n.translate("command.whitelist.add.error", event, throwable));
                     }
                 }
                 default -> event.reply(this.i18n.translate("command.not-found", event)).withEphemeral(true);

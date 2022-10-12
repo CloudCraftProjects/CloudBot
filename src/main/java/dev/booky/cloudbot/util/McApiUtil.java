@@ -6,6 +6,9 @@ import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.profile.PlayerProfile;
 
 import java.net.URI;
 import java.net.http.HttpResponse;
@@ -16,24 +19,43 @@ import java.util.regex.Pattern;
 
 public class McApiUtil {
 
-    private static final URI BASE_URI = URI.create("https://api.mojang.com/users/profiles/minecraft/");
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
     private static final Pattern USERNAME_PATTERN = Pattern.compile("[a-zA-Z0-9_]{3,16}");
+    private static final URI NAME_URI = URI.create("https://api.mojang.com/users/profiles/minecraft/");
 
-    private static final LoadingCache<String, McProfile> PROFILE_CACHE = Caffeine.newBuilder()
+    private static final LoadingCache<String, McProfile> NAME_PROFILE_CACHE = Caffeine.newBuilder()
             .expireAfterWrite(1, TimeUnit.HOURS)
             .build(McApiUtil::loadProfile0);
+    private static final LoadingCache<UUID, McProfile> UUID_PROFILE_CACHE = Caffeine.newBuilder()
+            .expireAfterWrite(1, TimeUnit.DAYS)
+            .build(McApiUtil::loadProfile0);
+
+    public static McProfile loadProfile(UUID uniqueId) {
+        return UUID_PROFILE_CACHE.get(uniqueId);
+    }
 
     public static McProfile loadProfile(String username) {
         if (!USERNAME_PATTERN.matcher(username).matches()) {
             throw new IllegalArgumentException("Illegal minecraft username '" + username + "'");
         }
 
-        return PROFILE_CACHE.get(username.toLowerCase(Locale.ROOT));
+        return NAME_PROFILE_CACHE.get(username.toLowerCase(Locale.ROOT));
+    }
+
+    @SuppressWarnings("deprecation") // Only way to get a profile from an offline player
+    private static McProfile loadProfile0(UUID uniqueId) {
+        OfflinePlayer player = Bukkit.getOfflinePlayer(uniqueId);
+        PlayerProfile profile = player.getPlayerProfile();
+
+        if (profile.getName() == null) {
+            profile = profile.update().join();
+        }
+
+        return new McProfile(profile.getName(), profile.getUniqueId());
     }
 
     private static McProfile loadProfile0(String username) {
-        String response = HttpUtil.getJoin(BASE_URI.resolve(username), HttpResponse.BodyHandlers.ofString());
+        String response = HttpUtil.getJoin(NAME_URI.resolve(username), HttpResponse.BodyHandlers.ofString());
         if (response.isEmpty()) { // Player does not exist
             throw new IllegalArgumentException("Player '" + username + "' does not exist");
         }
