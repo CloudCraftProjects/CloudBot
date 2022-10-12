@@ -3,6 +3,7 @@ package dev.booky.cloudbot;
 
 import dev.booky.cloudbot.commands.BotCommand;
 import dev.booky.cloudbot.commands.ListCommand;
+import dev.booky.cloudbot.commands.PluginsCommand;
 import dev.booky.cloudbot.commands.WhitelistCommand;
 import dev.booky.cloudbot.commands.WhitelistRemoveCommand;
 import dev.booky.cloudbot.i18n.TranslationManager;
@@ -100,6 +101,7 @@ public class CloudBotManager {
                 .build();
 
         Set<BotCommand> commands = Set.of(
+                new PluginsCommand(),
                 new ListCommand(),
                 new WhitelistCommand(),
                 new WhitelistRemoveCommand());
