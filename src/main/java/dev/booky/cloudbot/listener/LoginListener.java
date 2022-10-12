@@ -5,6 +5,7 @@ import dev.booky.cloudbot.CloudBotManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerLoginEvent;
 
@@ -18,7 +19,7 @@ public class LoginListener implements Listener {
         this.manager = manager;
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGH)
     public void onLogin(PlayerLoginEvent event) {
         if (event.getResult() != PlayerLoginEvent.Result.ALLOWED) {
             return;
@@ -29,6 +30,9 @@ public class LoginListener implements Listener {
 
         UUID uniqueId = event.getPlayer().getUniqueId();
         if (this.manager.getStorage().getWhitelist().containsKey(uniqueId)) {
+            return;
+        }
+        if (event.getPlayer().hasPermission("cloudbot.bypass-whitelist")) {
             return;
         }
 
