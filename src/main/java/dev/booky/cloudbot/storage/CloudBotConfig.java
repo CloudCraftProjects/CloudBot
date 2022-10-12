@@ -10,6 +10,8 @@ public class CloudBotConfig {
     private String token = "REPLACE_ME";
     private String inviteLink = "null";
     private boolean whitelistActive = true;
+    private long mainGuildId = -1L;
+    private long logChannelId = -1L;
 
     @SuppressWarnings("unused") // configurate
     private CloudBotConfig() {
@@ -25,5 +27,13 @@ public class CloudBotConfig {
 
     public boolean isWhitelistActive() {
         return whitelistActive;
+    }
+
+    public long getMainGuildId() {
+        return mainGuildId;
+    }
+
+    public long getLogChannelId() {
+        return logChannelId;
     }
 }

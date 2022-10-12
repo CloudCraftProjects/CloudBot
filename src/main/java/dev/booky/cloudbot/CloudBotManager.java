@@ -12,22 +12,31 @@ import dev.booky.cloudbot.storage.CloudBotConfig;
 import dev.booky.cloudbot.storage.CloudBotStorage;
 import dev.booky.cloudbot.storage.ConfigLoader;
 import dev.booky.cloudbot.storage.ConfigLoader.FileType;
+import dev.booky.cloudbot.util.CommandStringifier;
+import discord4j.common.util.Snowflake;
 import discord4j.core.DiscordClient;
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
+import discord4j.core.event.domain.guild.GuildCreateEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
+import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.User;
+import discord4j.core.object.entity.channel.TextChannel;
+import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.gateway.intent.IntentSet;
 import discord4j.rest.util.AllowedMentions;
+import discord4j.rest.util.Color;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.Nullable;
 import reactor.core.publisher.Mono;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -50,10 +59,11 @@ public class CloudBotManager {
             .append(Component.text(']', NamedTextColor.GRAY))
             .append(Component.space()).build();
 
+    private final TranslationManager i18n;
     private final Plugin plugin;
 
-    private final TranslationManager i18n;
     private GatewayDiscordClient gateway;
+    private TextChannel logChannel;
 
     private CloudBotStorage storage;
     private CloudBotConfig config;
@@ -88,11 +98,34 @@ public class CloudBotManager {
         this.config = ConfigLoader.loadObject(this.configPath, CloudBotConfig.class, FileType.YAML);
         this.storage = ConfigLoader.loadObject(this.storagePath, CloudBotStorage.class, FileType.JSON);
         this.i18n.reload();
+
+        if (this.gateway != null) {
+            this.reloadLogChannel(null);
+        }
     }
 
     public void saveStorages() {
         ConfigLoader.saveObject(this.configPath, this.getConfig(), FileType.YAML);
         ConfigLoader.saveObject(this.storagePath, this.getStorage(), FileType.JSON);
+    }
+
+    public void reloadLogChannel(@Nullable Guild guild) {
+        if (this.getConfig().getMainGuildId() == -1L) {
+            return;
+        }
+        if (this.getConfig().getLogChannelId() == -1L) {
+            return;
+        }
+
+        if (guild == null) {
+            guild = this.gateway.getGuildById(Snowflake.of(this.getConfig().getMainGuildId())).blockOptional().orElse(null);
+            if (guild == null) {
+                return;
+            }
+        }
+
+        this.logChannel = (TextChannel) guild.getChannelById(Snowflake.of(this.getConfig().getLogChannelId()))
+                .blockOptional().filter(channel -> channel instanceof TextChannel).orElse(null);
     }
 
     public void startBot() {
@@ -108,6 +141,7 @@ public class CloudBotManager {
 
         Mono<Void> login = client.gateway().setEnabledIntents(IntentSet.none()).withGateway(gateway -> {
             this.gateway = gateway;
+            this.reloadLogChannel(null);
 
             long appId = gateway.getRestClient().getApplicationId().blockOptional().orElseThrow();
             Map<String, BotCommand> commandMap = new HashMap<>(commands.size());
@@ -119,17 +153,32 @@ public class CloudBotManager {
                         .createGlobalApplicationCommand(appId, req).block();
             }
 
-            return gateway.on(ChatInputInteractionEvent.class, event -> {
+            return gateway.on(GuildCreateEvent.class, event -> {
+                if (event.getGuild().getId().asLong() != this.getConfig().getMainGuildId()) {
+                    return Mono.empty();
+                }
+
+                this.reloadLogChannel(event.getGuild());
+                return Mono.empty();
+            }).then().and(gateway.on(ChatInputInteractionEvent.class, event -> {
+                User user = event.getInteraction().getUser();
+                if (this.logChannel != null) {
+                    this.logChannel.createMessage().withEmbeds(EmbedCreateSpec.builder()
+                                    .title(user.getTag() + " (`" + user.getId().asString() + "`")
+                                    .description(CommandStringifier.stringify(event))
+                                    .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
+                                    .color(Color.of(0xa9f90f)).build())
+                            .subscribe();
+                }
+
                 BotCommand command = commandMap.get(event.getCommandName());
                 if (command == null) {
                     return event.reply(this.i18n.translate("command.not-found", event)).withEphemeral(true);
                 }
 
                 Translator translator = (key, args) -> this.i18n.translate(key, event, args);
-                User user = event.getInteraction().getUser();
-
                 return command.run(this, event.getCommandName(), event, user, translator);
-            });
+            }).then());
         });
 
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> login.block());
@@ -150,11 +199,15 @@ public class CloudBotManager {
         return Objects.requireNonNull(this.storage, "Storage has not been loaded yet");
     }
 
+    public TextChannel getLogChannel() {
+        return this.logChannel;
+    }
+
     public Plugin getPlugin() {
-        return plugin;
+        return this.plugin;
     }
 
     public boolean isDirty() {
-        return isDirty;
+        return this.isDirty;
     }
 }
