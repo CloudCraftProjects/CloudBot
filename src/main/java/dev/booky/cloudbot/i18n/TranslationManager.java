@@ -74,7 +74,7 @@ public final class TranslationManager {
     private void registerBundle(TranslationRegistry registry, Locale locale) {
         String baseName = this.plugin.getDescription().getName().toLowerCase(Locale.ROOT);
         ResourceBundle bundle = ResourceBundle.getBundle(baseName, locale, UTF8ResourceBundleControl.get());
-        registry.registerAll(locale, bundle, false);
+        registry.registerAll(locale, bundle, true);
     }
 
     public TranslationRegistry getRegistry() {
