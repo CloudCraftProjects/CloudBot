@@ -24,6 +24,7 @@ import discord4j.gateway.intent.IntentSet;
 import discord4j.rest.util.AllowedMentions;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.Permission;
+import discord4j.rest.util.PermissionSet;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -60,7 +61,7 @@ public class CloudBotManager {
     private final ReentrantLock whitelistListLock = new ReentrantLock();
     private final Plugin plugin;
 
-    private TranslationManager i18n;
+    private final TranslationManager i18n;
     private GatewayDiscordClient gateway;
 
     private CloudBotStorage storage;
@@ -108,20 +109,38 @@ public class CloudBotManager {
                 .setDefaultAllowedMentions(AllowedMentions.suppressAll())
                 .build();
 
+        ApplicationCommandRequest whitelistRemoveCommand = ApplicationCommandRequest.builder()
+                .name("whitelist-remove")
+                .description("Remove someone from the whitelist of the minecraft server")
+                .descriptionLocalizationsOrNull(Map.of("de", "Entfernt jemanden von der Whitelist des Minecraft Servers"))
+                .defaultMemberPermissions(Long.toString(PermissionSet.of(Permission.MANAGE_MESSAGES).getRawValue()))
+                .dmPermission(false)
+                .addOption(ApplicationCommandOptionData.builder()
+                        .name("username")
+                        .nameLocalizationsOrNull(Map.of("de", "nutzername"))
+                        .description("The ingame name of the player")
+                        .descriptionLocalizationsOrNull(Map.of("de", "Der Minecraft Ingame-Nutzername"))
+                        .type(ApplicationCommandOption.Type.STRING.getValue())
+                        .minLength(3).maxLength(16)
+                        .required(true)
+                        .build())
+                .build();
+
         ApplicationCommandRequest whitelistCommand = ApplicationCommandRequest.builder()
                 .name("whitelist")
                 .description("Access and modify the whitelist on the minecraft server")
                 .descriptionLocalizationsOrNull(Map.of("de", "Lässt dich auf die Whitelist des Minecraft Servers zugreifen und bearbeiten"))
+                .dmPermission(false)
                 .addOption(ApplicationCommandOptionData.builder()
                         .name("add")
-                        .description("Whitelists you on the Minecraft Server")
+                        .description("Whitelists you on the minecraft server")
                         .descriptionLocalizationsOrNull(Map.of("de", "Whitelisted dich auf dem Minecraft Server"))
                         .type(ApplicationCommandOption.Type.SUB_COMMAND.getValue())
                         .addOption(ApplicationCommandOptionData.builder()
                                 .name("username")
                                 .nameLocalizationsOrNull(Map.of("de", "nutzername"))
-                                .description("Your Minecraft ingame name")
-                                .descriptionLocalizationsOrNull(Map.of("de", "Dein Minecraft Ingame-Name"))
+                                .description("Your minecraft ingame name")
+                                .descriptionLocalizationsOrNull(Map.of("de", "Dein Minecraft Ingame-Nutzername"))
                                 .type(ApplicationCommandOption.Type.STRING.getValue())
                                 .minLength(3).maxLength(16)
                                 .required(true)
@@ -135,15 +154,28 @@ public class CloudBotManager {
                         .build())
                 .build();
 
+
         Mono<Void> login = client.gateway().setEnabledIntents(IntentSet.none()).withGateway(gateway -> {
             this.gateway = gateway;
 
             long appId = gateway.getRestClient().getApplicationId().blockOptional().orElseThrow();
-            gateway.getRestClient().getApplicationService()
-                    .createGuildApplicationCommand(appId, 737751273163718668L, whitelistCommand)
-                    .block();
+            gateway.getRestClient().getApplicationService().createGlobalApplicationCommand(appId, whitelistCommand).block();
+            gateway.getRestClient().getApplicationService().createGlobalApplicationCommand(appId, whitelistRemoveCommand).block();
 
             return gateway.on(ChatInputInteractionEvent.class, event -> switch (event.getCommandName()) {
+                case "whitelist-remove" -> {
+                    String username = event.getOption("username")
+                            .flatMap(ApplicationCommandInteractionOption::getValue)
+                            .map(ApplicationCommandInteractionOptionValue::asString)
+                            .orElseThrow();
+                    McProfile profile = McApiUtil.loadProfile(username);
+                    if (!this.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
+                        yield event.reply(this.i18n.translate("command.whitelist-remove.not-whitelisted", event)).withEphemeral(true);
+                    }
+
+                    this.updateStorage(storage -> storage.getWhitelist().remove(profile.getUniqueId()));
+                    yield event.reply(this.i18n.translate("command.whitelist-remove.success", event)).withEphemeral(true);
+                }
                 case "whitelist" -> {
                     if (event.getOption("list").isPresent()) {
                         event.deferReply().withEphemeral(true).subscribe();
