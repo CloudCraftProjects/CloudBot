@@ -1,6 +1,7 @@
 package dev.booky.cloudbot;
 // Created by booky10 in CloudBot (15:48 10.10.22)
 
+import dev.booky.cloudbot.listener.LoginListener;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -19,6 +20,8 @@ public class CloudBotMain extends JavaPlugin {
     public void onEnable() {
         this.manager.reloadStorages();
         this.manager.startBot();
+
+        Bukkit.getPluginManager().registerEvents(new LoginListener(this.manager), this);
 
         Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
             if (this.manager.isDirty()) {

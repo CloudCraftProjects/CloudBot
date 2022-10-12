@@ -8,12 +8,22 @@ import org.spongepowered.configurate.objectmapping.ConfigSerializable;
 public class CloudBotConfig {
 
     private String token = "REPLACE_ME";
+    private String inviteLink = "null";
+    private boolean whitelistActive = true;
 
     @SuppressWarnings("unused") // configurate
     private CloudBotConfig() {
     }
 
     public String getToken() {
-        return token;
+        return this.token;
+    }
+
+    public String getInviteLink() {
+        return "null".equals(this.inviteLink) ? null : this.inviteLink;
+    }
+
+    public boolean isWhitelistActive() {
+        return whitelistActive;
     }
 }
