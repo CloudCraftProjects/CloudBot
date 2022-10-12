@@ -68,7 +68,7 @@ public class WhitelistCommand implements BotCommand {
 
                 try {
                     StringBuilder builder = new StringBuilder();
-                    Set<UUID> playerIds = manager.getStorage().getWhitelist().keySet();
+                    Set<UUID> playerIds = Set.copyOf(manager.getStorage().getWhitelist().keySet());
 
                     try {
                         for (UUID playerId : playerIds) {
