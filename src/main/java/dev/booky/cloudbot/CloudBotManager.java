@@ -2,6 +2,7 @@ package dev.booky.cloudbot;
 // Created by booky10 in CloudBot (16:04 10.10.22)
 
 import dev.booky.cloudbot.commands.BotCommand;
+import dev.booky.cloudbot.commands.ListCommand;
 import dev.booky.cloudbot.commands.WhitelistCommand;
 import dev.booky.cloudbot.commands.WhitelistRemoveCommand;
 import dev.booky.cloudbot.i18n.TranslationManager;
@@ -99,6 +100,7 @@ public class CloudBotManager {
                 .build();
 
         Set<BotCommand> commands = Set.of(
+                new ListCommand(),
                 new WhitelistCommand(),
                 new WhitelistRemoveCommand());
 
