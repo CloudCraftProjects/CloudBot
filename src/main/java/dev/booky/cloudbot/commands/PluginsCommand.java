@@ -10,8 +10,8 @@ import discord4j.discordjson.json.ApplicationCommandRequest;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.reactivestreams.Publisher;
-import org.yaml.snakeyaml.error.Mark;
 
+import java.util.Formatter;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +19,10 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 public class PluginsCommand implements BotCommand {
+
+    private static final String PLUGINS_FORMAT = "Plugins (%d): ";
+    private static final String PLUGIN_WITH_SITE_FORMAT = "[%s](<%3$2s>) (`v%2$2s`)";
+    private static final String PLUGIN_NO_SITE_FORMAT = "%s (`v%s`)";
 
     @Override
     public ApplicationCommandRequest provideCommandData() {
@@ -36,7 +40,8 @@ public class PluginsCommand implements BotCommand {
         plugins.removeIf(Predicate.not(Plugin::isEnabled));
 
         StringBuilder builder = new StringBuilder();
-        builder.append("Plugins (").append(plugins.size()).append("): ");
+        Formatter formatter = new Formatter(builder);
+        formatter.format(PLUGINS_FORMAT, plugins.size());
 
         boolean firstPlugin = true;
         for (Plugin plugin : plugins) {
@@ -46,24 +51,12 @@ public class PluginsCommand implements BotCommand {
                 builder.append(", ");
             }
 
-            String name = plugin.getDescription().getName();
-            String website = plugin.getDescription().getWebsite();
-            String version = plugin.getDescription().getVersion();
+            String name = MarkdownEscape.escape(plugin.getDescription().getName());
+            String version = MarkdownEscape.escape(plugin.getDescription().getVersion());
+            String website = MarkdownEscape.escape(plugin.getDescription().getWebsite());
 
-            if (website != null) {
-                builder.append('[');
-            }
-
-            builder.append(MarkdownEscape.escape(name));
-            if (website != null) {
-                builder.append("](");
-                builder.append(MarkdownEscape.escape(website));
-                builder.append(')');
-            }
-
-            builder.append(" (`");
-            builder.append(MarkdownEscape.escape(version));
-            builder.append("`)");
+            String format = website != null ? PLUGIN_WITH_SITE_FORMAT : PLUGIN_NO_SITE_FORMAT;
+            formatter.format(format, name, version, website);
         }
 
         return event.reply(builder.toString()).withEphemeral(true);
