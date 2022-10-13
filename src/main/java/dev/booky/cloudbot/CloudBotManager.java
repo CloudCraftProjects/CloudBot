@@ -165,7 +165,7 @@ public class CloudBotManager {
                 User user = event.getInteraction().getUser();
                 if (this.logChannel != null) {
                     String escapedTag = MarkdownEscape.escape(user.getTag());
-                    String desc = escapedTag + " (`" + user.getId().asString() + ")`\n" +
+                    String desc = "**" + escapedTag + "** (`" + user.getId().asString() + ")`\n" +
                             "> " + CommandStringifier.stringify(event);
 
                     this.logChannel.createMessage().withEmbeds(EmbedCreateSpec.builder()
