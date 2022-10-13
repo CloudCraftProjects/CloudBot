@@ -26,7 +26,8 @@ public class ConfigLoader {
     }
 
     public static GsonConfigurationLoader createGsonLoader(Path path) {
-        return GSON_LOADER_CACHE.computeIfAbsent(path, $ -> GsonConfigurationLoader.builder().path(path).build());
+        return GSON_LOADER_CACHE.computeIfAbsent(path, $ -> GsonConfigurationLoader.builder().path(path)
+                .indent(0).build());
     }
 
     public static <T> T loadObject(Path path, Class<T> clazz, FileType type) {
