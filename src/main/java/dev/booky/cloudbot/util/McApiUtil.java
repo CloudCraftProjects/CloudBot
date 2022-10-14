@@ -24,7 +24,7 @@ public class McApiUtil {
     private static final URI NAME_URI = URI.create("https://api.mojang.com/users/profiles/minecraft/");
 
     private static final LoadingCache<String, McProfile> NAME_PROFILE_CACHE = Caffeine.newBuilder()
-            .expireAfterWrite(1, TimeUnit.HOURS)
+            .expireAfterWrite(1, TimeUnit.DAYS)
             .build(McApiUtil::loadProfile0);
     private static final LoadingCache<UUID, McProfile> UUID_PROFILE_CACHE = Caffeine.newBuilder()
             .expireAfterWrite(1, TimeUnit.DAYS)
@@ -51,7 +51,11 @@ public class McApiUtil {
             profile = profile.update().join();
         }
 
-        return new McProfile(profile.getName(), profile.getUniqueId());
+        McProfile apiProfile = new McProfile(profile.getName(), profile.getUniqueId());
+        if (apiProfile.getUsername() != null) {
+            NAME_PROFILE_CACHE.put(apiProfile.getUsername().toLowerCase(Locale.ROOT), apiProfile);
+        }
+        return apiProfile;
     }
 
     private static McProfile loadProfile0(String username) {
@@ -67,7 +71,10 @@ public class McApiUtil {
 
         UUID uniqueId = FastUuidSansHyphens.parseUuid(jsonResp.get("id").getAsString());
         String realUsername = jsonResp.get("name").getAsString();
-        return new McProfile(realUsername, uniqueId);
+
+        McProfile profile = new McProfile(realUsername, uniqueId);
+        UUID_PROFILE_CACHE.put(uniqueId, profile);
+        return profile;
     }
 
     public static class McProfile {
