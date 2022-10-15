@@ -17,4 +17,12 @@ public final class MarkdownEscape {
         }
         return MD_ESCAPE.matcher(string).replaceAll("\\\\$1");
     }
+
+    @Contract("null -> null; !null -> !null")
+    public static @Nullable String codeEscape(@Nullable String string) {
+        if (string == null) {
+            return null;
+        }
+        return string.replace("`", "\\`");
+    }
 }

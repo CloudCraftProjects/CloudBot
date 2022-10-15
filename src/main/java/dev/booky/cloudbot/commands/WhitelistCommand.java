@@ -93,7 +93,8 @@ public class WhitelistCommand implements BotCommand {
                         }
                     } catch (Throwable throwable) {
                         throwable.printStackTrace();
-                        builder.append(i18n.apply("command.whitelist.list.error", MarkdownEscape.escape(throwable.toString())));
+                        builder.append(i18n.apply("command.whitelist.list.error",
+                                "`" + MarkdownEscape.codeEscape(throwable.toString()) + "`"));
                     }
 
                     event.createFollowup()
@@ -124,7 +125,7 @@ public class WhitelistCommand implements BotCommand {
             McApiUtil.McProfile profile = McApiUtil.loadProfile(username);
             if (manager.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
                 return event.reply(i18n.apply("command.whitelist.add.error.mc-already-whitelisted",
-                        MarkdownEscape.escape(profile.getUsername())));
+                        "`" + MarkdownEscape.codeEscape(profile.getUsername()) + "`"));
             }
             if (manager.getStorage().getWhitelist().containsValue(user.getId().asLong())) {
                 boolean bypass = event.getInteraction().getGuildId()
@@ -141,15 +142,16 @@ public class WhitelistCommand implements BotCommand {
             manager.updateStorage(storage -> storage.getWhitelist().put(profile.getUniqueId(), user.getId().asLong()));
             return event.reply().withEmbeds(EmbedCreateSpec.builder()
                     .color(Color.GREEN).title(i18n.apply("command.whitelist.add.success.title"))
-                    .description(i18n.apply("command.whitelist.add.success.description",
-                            user.getMention(), MarkdownEscape.escape(profile.getUsername())))
+                    .description(i18n.apply("command.whitelist.add.success.description", user.getMention(),
+                            "`" + MarkdownEscape.codeEscape(profile.getUsername()) + "`"))
                     .footer(MarkdownEscape.escape(user.getTag()), user.getAvatarUrl())
                     .thumbnail("https://crafthead.net/helm/" + profile.getUniqueId() + "/128")
                     .timestamp(Instant.now())
                     .build());
         } catch (Throwable throwable) {
             throwable.printStackTrace();
-            return event.reply(i18n.apply("command.whitelist.add.error.general", throwable));
+            return event.reply(i18n.apply("command.whitelist.add.error.general",
+                    MarkdownEscape.codeEscape(throwable.toString())));
         }
     }
 }

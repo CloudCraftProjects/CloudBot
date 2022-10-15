@@ -50,11 +50,11 @@ public class WhitelistRemoveCommand implements BotCommand {
         McApiUtil.McProfile profile = McApiUtil.loadProfile(username);
         if (!manager.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
             return event.reply(i18n.apply("command.whitelist-remove.not-whitelisted",
-                    MarkdownEscape.escape(profile.getUsername()))).withEphemeral(true);
+                    "`" + MarkdownEscape.codeEscape(profile.getUsername()) + "`")).withEphemeral(true);
         }
 
         manager.updateStorage(storage -> storage.getWhitelist().remove(profile.getUniqueId()));
         return event.reply(i18n.apply("command.whitelist-remove.success",
-                MarkdownEscape.escape(profile.getUsername()))).withEphemeral(true);
+                "`" + MarkdownEscape.codeEscape(profile.getUsername()) + "`")).withEphemeral(true);
     }
 }
