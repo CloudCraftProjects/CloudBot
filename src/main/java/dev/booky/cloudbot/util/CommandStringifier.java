@@ -12,7 +12,7 @@ public final class CommandStringifier {
 
     public static String stringify(ChatInputInteractionEvent event) {
         StringBuilder builder = new StringBuilder("`/");
-        builder.append(MarkdownEscape.escape(event.getCommandName()));
+        builder.append(MarkdownEscape.codeEscape(event.getCommandName()));
 
         stringify0(builder, event.getOptions());
         return builder.append('`').toString();
@@ -26,11 +26,11 @@ public final class CommandStringifier {
     }
 
     private static void stringify0(StringBuilder builder, ApplicationCommandInteractionOption option) {
-        builder.append(MarkdownEscape.escape(option.getName())).append(':');
+        builder.append(MarkdownEscape.codeEscape(option.getName())).append(':');
         switch (option.getType()) {
             case STRING -> {
                 String value = option.getValue().map(ApplicationCommandInteractionOptionValue::asString).orElse("null");
-                builder.append('\'').append(MarkdownEscape.escape(value)).append('\'');
+                builder.append('\'').append(MarkdownEscape.codeEscape(value)).append('\'');
             }
             case BOOLEAN -> builder.append(option.getValue()
                     .map(ApplicationCommandInteractionOptionValue::asBoolean)

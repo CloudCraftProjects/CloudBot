@@ -144,7 +144,7 @@ public class WhitelistCommand implements BotCommand {
                     .color(Color.GREEN).title(i18n.apply("command.whitelist.add.success.title"))
                     .description(i18n.apply("command.whitelist.add.success.description", user.getMention(),
                             "`" + MarkdownEscape.codeEscape(profile.getUsername()) + "`"))
-                    .footer(MarkdownEscape.escape(user.getTag()), user.getAvatarUrl())
+                    .footer(user.getTag(), user.getAvatarUrl())
                     .thumbnail("https://crafthead.net/helm/" + profile.getUniqueId() + "/128")
                     .timestamp(Instant.now())
                     .build());

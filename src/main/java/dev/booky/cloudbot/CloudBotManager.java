@@ -164,13 +164,12 @@ public class CloudBotManager {
             }).then().and(gateway.on(ChatInputInteractionEvent.class, event -> {
                 User user = event.getInteraction().getUser();
                 if (this.logChannel != null) {
-                    String escapedTag = MarkdownEscape.escape(user.getTag());
-                    String desc = "**" + escapedTag + "** (`" + user.getId().asString() + ")`\n" +
+                    String desc = "**" + MarkdownEscape.escape(user.getTag()) + "** (`" + user.getId().asString() + ")`\n" +
                             "> " + CommandStringifier.stringify(event);
 
                     this.logChannel.createMessage().withEmbeds(EmbedCreateSpec.builder()
                                     .description(desc).color(Color.of(0xa9f90f))
-                                    .timestamp(Instant.now()).footer(escapedTag, user.getAvatarUrl())
+                                    .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
                                     .build())
                             .subscribe();
                 }
