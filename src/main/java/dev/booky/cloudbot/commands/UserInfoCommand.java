@@ -19,6 +19,9 @@ import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.Permission;
 import discord4j.rest.util.PermissionSet;
+import org.bukkit.BanEntry;
+import org.bukkit.BanList;
+import org.bukkit.Bukkit;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
@@ -136,7 +139,9 @@ public class UserInfoCommand implements BotCommand {
                 "Flags: " + target.getPublicFlags().stream().map(flag -> "`" + flag.name() + "`").collect(Collectors.joining(", ")));
 
         if (!profiles.isEmpty()) {
+            BanList banlist = Bukkit.getBanList(BanList.Type.NAME);
             description.append("\n\n");
+
             for (McProfile profile : profiles) {
                 description
                         .append("Whitelisted User: `")
@@ -144,6 +149,44 @@ public class UserInfoCommand implements BotCommand {
                         .append("` (`")
                         .append(profile.getUniqueId())
                         .append("`)\n");
+
+                BanEntry entry = banlist.getBanEntry(profile.getUniqueId().toString());
+                if (entry == null) {
+                    continue;
+                }
+
+                long created = entry.getCreated().getTime();
+                long expiration = entry.getExpiration() == null ? -1 : entry.getExpiration().getTime();
+
+                description
+                        .append("> **Banned** by `")
+                        .append(MarkdownEscape.codeEscape(entry.getSource()))
+                        .append('`');
+
+                if (expiration == -1) {
+                    description.append(" (**Permanent**)");
+                }
+                description.append(":\n");
+
+                description
+                        .append("> Reason: `")
+                        .append(MarkdownEscape.codeEscape(entry.getReason()))
+                        .append("`\n");
+                description
+                        .append("> Since: <t:")
+                        .append(created / 1000)
+                        .append(":f> (<t:")
+                        .append(created / 1000)
+                        .append(":R>)\n");
+
+                if (expiration != -1) {
+                    description
+                            .append("> Expires: <t:")
+                            .append(expiration / 1000)
+                            .append(":f> (<t:")
+                            .append(expiration / 1000)
+                            .append(":R>)\n");
+                }
             }
         }
 
