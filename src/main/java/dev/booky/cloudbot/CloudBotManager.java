@@ -2,6 +2,7 @@ package dev.booky.cloudbot;
 // Created by booky10 in CloudBot (16:04 10.10.22)
 
 import dev.booky.cloudbot.commands.BotCommand;
+import dev.booky.cloudbot.commands.ExecuteCommand;
 import dev.booky.cloudbot.commands.ListCommand;
 import dev.booky.cloudbot.commands.PluginsCommand;
 import dev.booky.cloudbot.commands.UserInfoCommand;
@@ -136,6 +137,7 @@ public class CloudBotManager {
                 .build();
 
         Set<BotCommand> commands = Set.of(
+                new ExecuteCommand(),
                 new UserInfoCommand(),
                 new PluginsCommand(),
                 new ListCommand(),
