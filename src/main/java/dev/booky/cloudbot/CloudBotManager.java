@@ -43,6 +43,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -168,11 +169,18 @@ public class CloudBotManager {
             }).then().and(gateway.on(ChatInputInteractionEvent.class, event -> {
                 User user = event.getInteraction().getUser();
                 if (this.logChannel != null) {
+                    Optional<Snowflake> guildId = event.getInteraction().getGuildId();
+                    String location = guildId.map(snowflake -> "" +
+                                    "Guild: `" + snowflake.asString() + "`\n" +
+                                    "Channel: `" + event.getInteraction().getChannelId().asString() + "`")
+                            .orElseGet(() -> "Private Messages: `" + event.getInteraction().getChannelId().asString() + "`")
+                            + "\n";
+
                     String desc = "**" + MarkdownEscape.escape(user.getTag()) + "** (`" + user.getId().asString() + ")`\n" +
-                            "> " + CommandStringifier.stringify(event);
+                            location + "> " + CommandStringifier.stringify(event);
 
                     this.logChannel.createMessage().withEmbeds(EmbedCreateSpec.builder()
-                                    .description(desc).color(Color.of(0xa9f90f))
+                                    .description(desc).color(Color.of(0xA9F90F))
                                     .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
                                     .build())
                             .subscribe();
