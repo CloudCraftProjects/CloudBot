@@ -23,6 +23,7 @@ import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.guild.GuildCreateEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.entity.Guild;
+import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.User;
 import discord4j.core.object.entity.channel.TextChannel;
 import discord4j.core.spec.EmbedCreateSpec;
@@ -38,6 +39,8 @@ import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Nullable;
 import reactor.core.publisher.Mono;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.HashMap;
@@ -45,6 +48,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 public class CloudBotManager {
@@ -168,6 +172,8 @@ public class CloudBotManager {
                 return Mono.empty();
             }).then().and(gateway.on(ChatInputInteractionEvent.class, event -> {
                 User user = event.getInteraction().getUser();
+                CompletableFuture<Message> logMessage = new CompletableFuture<>();
+
                 if (this.logChannel != null) {
                     Optional<Snowflake> guildId = event.getInteraction().getGuildId();
                     String location = guildId.map(snowflake -> "" +
@@ -183,7 +189,7 @@ public class CloudBotManager {
                                     .description(desc).color(Color.of(0xA9F90F))
                                     .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
                                     .build())
-                            .subscribe();
+                            .subscribe(logMessage::complete);
                 }
 
                 BotCommand command = commandMap.get(event.getCommandName());
@@ -191,8 +197,44 @@ public class CloudBotManager {
                     return event.reply(this.i18n.translate("command.not-found", event)).withEphemeral(true);
                 }
 
-                Translator translator = (key, args) -> this.i18n.translate(key, event, args);
-                return command.run(this, event.getCommandName(), event, user, translator);
+                try {
+                    Translator translator = (key, args) -> this.i18n.translate(key, event, args);
+                    return command.run(this, event.getCommandName(), event, user, translator);
+                } catch (Throwable throwable) {
+                    throwable.printStackTrace();
+                    if (this.logChannel != null) {
+                        logMessage.thenAccept(msg -> {
+                            StringWriter strWriter = new StringWriter();
+                            try (PrintWriter writer = new PrintWriter(strWriter)) {
+                                throwable.printStackTrace(writer);
+                            }
+
+                            String stacktrace = strWriter.toString();
+                            int maxSize = 4096 - 3 * 2 /*code block markers*/;
+
+                            if (stacktrace.length() > maxSize) {
+                                stacktrace = stacktrace.substring(0, maxSize - 3 /*three dots*/) + "...";
+                            }
+
+                            this.logChannel.createMessage()
+                                    .withEmbeds(EmbedCreateSpec.builder()
+                                            .description("```" + stacktrace + "```")
+                                            .color(Color.of(0xCE3C1E))
+                                            .timestamp(Instant.now())
+                                            .footer(user.getTag(), user.getAvatarUrl())
+                                            .build())
+                                    .withMessageReference(msg.getId())
+                                    .subscribe();
+                        });
+                    }
+
+                    // We sadly don't know if a reply has already been defered, so have to ignore errors :(
+                    event.deferReply().withEphemeral(true)
+                            .onErrorResume(e -> Mono.empty()).subscribe();
+
+                    return event.createFollowup(this.i18n.translate("command.errored", event,
+                            "`" + MarkdownEscape.codeEscape(throwable.toString()) + "`")).then();
+                }
             }).then());
         });
 
