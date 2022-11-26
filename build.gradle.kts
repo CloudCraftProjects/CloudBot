@@ -22,6 +22,9 @@ dependencies {
     compileOnlyApi("org.spongepowered:configurate-yaml:4.1.2")
     compileOnlyApi("com.discord4j:discord4j-core:3.2.3")
 
+    // Optional dependency plugins
+    compileOnlyApi("me.lucko:spark-api:0.1-SNAPSHOT")
+
     // Shadowed
     api("org.bstats:bstats-bukkit:3.0.0")
 }

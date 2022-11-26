@@ -5,6 +5,7 @@ import dev.booky.cloudbot.commands.BotCommand;
 import dev.booky.cloudbot.commands.ExecuteCommand;
 import dev.booky.cloudbot.commands.ListCommand;
 import dev.booky.cloudbot.commands.PluginsCommand;
+import dev.booky.cloudbot.commands.TpsCommand;
 import dev.booky.cloudbot.commands.UserInfoCommand;
 import dev.booky.cloudbot.commands.WhitelistCommand;
 import dev.booky.cloudbot.commands.WhitelistRemoveCommand;
@@ -44,6 +45,7 @@ import java.io.StringWriter;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -141,13 +143,17 @@ public class CloudBotManager {
                 .setDefaultAllowedMentions(AllowedMentions.suppressAll())
                 .build();
 
-        Set<BotCommand> commands = Set.of(
-                new ExecuteCommand(),
-                new UserInfoCommand(),
-                new PluginsCommand(),
-                new ListCommand(),
-                new WhitelistCommand(),
-                new WhitelistRemoveCommand());
+        Set<BotCommand> commands = new HashSet<>();
+        commands.add(new ExecuteCommand());
+        commands.add(new UserInfoCommand());
+        commands.add(new PluginsCommand());
+        commands.add(new ListCommand());
+        commands.add(new WhitelistCommand());
+        commands.add(new WhitelistRemoveCommand());
+
+        if (Bukkit.getPluginManager().getPlugin("spark") != null) {
+            commands.add(new TpsCommand());
+        }
 
         Mono<Void> login = client.gateway().setEnabledIntents(IntentSet.none()).withGateway(gateway -> {
             this.gateway = gateway;

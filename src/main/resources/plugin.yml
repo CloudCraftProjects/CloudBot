@@ -4,6 +4,7 @@ author: booky10
 version: ${version}
 api-version: 1.19
 load: POSTWORLD
+softdepend: [ spark ]
 libraries:
   - org.spongepowered:configurate-gson:4.1.2
   - org.spongepowered:configurate-yaml:4.1.2
