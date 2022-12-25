@@ -37,9 +37,9 @@ public class LoginListener implements Listener {
         }
 
         String inviteLink = this.manager.getConfig().getInviteLink();
-        String message = "Please join our discord";
+        String message = "You are not whitelisted on this server.";
         if (inviteLink != null) {
-            message += ": " + inviteLink;
+            message += " You can join our discord to whitelist yourself via " + inviteLink + ".";
         }
 
         event.disallow(PlayerLoginEvent.Result.KICK_WHITELIST, Component.text(message, NamedTextColor.RED));
