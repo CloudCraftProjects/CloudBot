@@ -10,29 +10,31 @@ import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.Role;
 import discord4j.core.object.entity.User;
 import discord4j.core.util.OrderUtil;
-import discord4j.discordjson.json.ApplicationCommandRequest;
+import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
 
-public class TeamMembersCommand implements BotCommand {
+public final class TeamMembersCommand extends AbstractBotCommand {
 
-    @Override
-    public ApplicationCommandRequest provideCommandData() {
-        return ApplicationCommandRequest.builder()
-                .name("team")
-                .description("Lists all members which are in the server team")
-                .descriptionLocalizationsOrNull(Map.of("de", "Liste alle Mitglieder des Server-Teams auf"))
-                .dmPermission(true)
-                .build();
+    public TeamMembersCommand(CloudBotManager manager) {
+        super(manager, "team");
     }
 
     @Override
-    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
-        Guild guild = manager.getMainGuild();
+    protected void buildRequest(ImmutableApplicationCommandRequest.Builder builder) {
+        builder
+                .description("Lists all members which are in the server team")
+                .descriptionLocalizationsOrNull(Map.of("de", "Liste alle Mitglieder des Server-Teams auf"))
+                .dmPermission(true);
+    }
+
+    @Override
+    public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
+        Guild guild = this.manager.getMainGuild();
         Preconditions.checkState(guild != null, "No main guild configured");
 
-        long teamRoleId = manager.getConfig().getTeamRoleId();
+        long teamRoleId = this.manager.getConfig().getTeamRoleId();
         Preconditions.checkState(teamRoleId != -1L, "No team role configured");
 
         Snowflake teamRoleSf = Snowflake.of(teamRoleId);

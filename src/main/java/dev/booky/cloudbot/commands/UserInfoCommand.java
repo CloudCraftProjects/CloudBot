@@ -15,7 +15,7 @@ import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.User;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
-import discord4j.discordjson.json.ApplicationCommandRequest;
+import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.Permission;
 import discord4j.rest.util.PermissionSet;
@@ -33,13 +33,16 @@ import java.util.stream.Collectors;
 import static discord4j.rest.util.Image.Format.GIF;
 import static discord4j.rest.util.Image.Format.PNG;
 
-public class UserInfoCommand implements BotCommand {
+public final class UserInfoCommand extends AbstractBotCommand {
+
+    public UserInfoCommand(CloudBotManager manager) {
+        super(manager, "user");
+    }
 
     @Override
-    public ApplicationCommandRequest provideCommandData() {
-        return ApplicationCommandRequest.builder()
-                .name("user")
-                .description("Show the info of a specified user")
+    protected void buildRequest(ImmutableApplicationCommandRequest.Builder builder) {
+        builder
+                .description("Show info about the specified user")
                 .descriptionLocalizationsOrNull(Map.of("de", "Gucke dir die Informationen über den angegebenen Nutzer an"))
                 .defaultMemberPermissions(Long.toString(PermissionSet.of(Permission.MANAGE_MESSAGES).getRawValue()))
                 .dmPermission(false)
@@ -71,12 +74,11 @@ public class UserInfoCommand implements BotCommand {
                                 .minLength(3).maxLength(16)
                                 .required(true)
                                 .build())
-                        .build())
-                .build();
+                        .build());
     }
 
     @Override
-    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
         if (event.getOption("discord").isPresent()) {
             User target = event.getOption("discord")
                     .flatMap(option -> option.getOption("user"))
@@ -84,7 +86,7 @@ public class UserInfoCommand implements BotCommand {
                     .map(ApplicationCommandInteractionOptionValue::asUser)
                     .flatMap(Mono::blockOptional)
                     .orElseThrow();
-            return showDiscordInfo(manager, event, user, target);
+            return showDiscordInfo(event, user, target);
         }
 
         McProfile target = event.getOption("minecraft")
@@ -93,11 +95,11 @@ public class UserInfoCommand implements BotCommand {
                 .map(ApplicationCommandInteractionOptionValue::asString)
                 .map(McApiUtil::loadProfile)
                 .orElseThrow();
-        return showMinecraftInfo(manager, event, user, target);
+        return showMinecraftInfo(event, user, target);
     }
 
-    private Mono<Void> showMinecraftInfo(CloudBotManager manager, ChatInputInteractionEvent event, User user, McProfile targetProfile) {
-        Long targetId = manager.getStorage().getWhitelist().get(targetProfile.getUniqueId());
+    private Mono<Void> showMinecraftInfo(ChatInputInteractionEvent event, User user, McProfile targetProfile) {
+        Long targetId = this.manager.getStorage().getWhitelist().get(targetProfile.getUniqueId());
         if (targetId == null) {
             throw new IllegalStateException("User '" + targetProfile.getUsername() + "' is not on whitelist");
         }
@@ -107,23 +109,22 @@ public class UserInfoCommand implements BotCommand {
             throw new IllegalStateException("User '" + targetId + "' can't be found");
         }
 
-        return showDiscordInfo(manager, event, user, target);
+        return showDiscordInfo(event, user, target);
     }
 
-    private Mono<Void> showDiscordInfo(CloudBotManager manager, ChatInputInteractionEvent event, User user, User target) {
+    private Mono<Void> showDiscordInfo(ChatInputInteractionEvent event, User user, User target) {
         Optional<Member> optMember = target.asMember(event.getInteraction().getGuildId().orElseThrow()).blockOptional();
         Optional<String> guildAvatar = optMember.flatMap(member -> member.getGuildAvatarUrl(member.hasAnimatedGuildAvatar() ? GIF : PNG));
         Optional<String> nickname = optMember.flatMap(Member::getNickname).map(MarkdownEscape::codeEscape);
         Optional<Long> joinTime = optMember.flatMap(Member::getJoinTime).map(Instant::getEpochSecond);
         long createTime = target.getId().getTimestamp().getEpochSecond();
 
-        List<McProfile> profiles = manager.getStorage().getWhitelist().entrySet().stream()
+        List<McProfile> profiles = this.manager.getStorage().getWhitelist().entrySet().stream()
                 .filter(entry -> entry.getValue() == target.getId().asLong())
                 .map(Map.Entry::getKey).map(McApiUtil::loadProfile)
                 .toList();
 
-        StringBuilder description = new StringBuilder("" +
-                "> **Discord Info**\n" +
+        StringBuilder description = new StringBuilder("> **Discord Info**\n" +
                 "Username: `" + MarkdownEscape.codeEscape(target.getUsername()) + "`\n" +
                 (nickname.map(name -> "Nickname: `" + name + "`\n").orElse("")) +
                 "Discriminator: `#" + target.getDiscriminator() + "`\n" +

@@ -6,7 +6,7 @@ import dev.booky.cloudbot.i18n.Translator;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.entity.User;
 import discord4j.core.spec.EmbedCreateSpec;
-import discord4j.discordjson.json.ApplicationCommandRequest;
+import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.rest.util.Color;
 import me.lucko.spark.api.Spark;
 import me.lucko.spark.api.SparkProvider;
@@ -16,27 +16,28 @@ import me.lucko.spark.api.statistic.StatisticWindow.TicksPerSecond;
 import me.lucko.spark.api.statistic.misc.DoubleAverageInfo;
 import me.lucko.spark.api.statistic.types.DoubleStatistic;
 import me.lucko.spark.api.statistic.types.GenericStatistic;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 
-public class TpsCommand implements BotCommand {
+public final class TpsCommand extends AbstractBotCommand {
 
-    @Override
-    public ApplicationCommandRequest provideCommandData() {
-        return ApplicationCommandRequest.builder()
-                .name("tps")
-                .description("Shows you information about the current server performance")
-                .descriptionLocalizationsOrNull(Map.of("de", "Zeigt dir die Server-Performance an"))
-                .dmPermission(true)
-                .build();
+    public TpsCommand(CloudBotManager manager) {
+        super(manager, "tps");
     }
 
     @Override
-    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    protected void buildRequest(ImmutableApplicationCommandRequest.Builder builder) {
+        builder
+                .description("Shows you information about the current server performance")
+                .descriptionLocalizationsOrNull(Map.of("de", "Zeigt dir die Server-Performance an"))
+                .dmPermission(true);
+    }
+
+    @Override
+    public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
         Spark spark = SparkProvider.get();
         StringBuilder descBuilder = new StringBuilder();
 
@@ -50,25 +51,25 @@ public class TpsCommand implements BotCommand {
 
         descBuilder
                 .append("\n> **Server TPS**")
-                .append("\n\u2022 `10s: ").append(tps10s).append(" TPS`")
-                .append("\n\u2022 `1min: ").append(tps1min).append(" TPS`")
-                .append("\n\u2022 `5min: ").append(tps5min).append(" TPS`\n");
+                .append("\n- `10s: ").append(tps10s).append(" TPS`")
+                .append("\n- `1min: ").append(tps1min).append(" TPS`")
+                .append("\n- `5min: ").append(tps5min).append(" TPS`\n");
 
         double mspt10s = Math.round(mspt.poll(MillisPerTick.SECONDS_10).percentile(0.9d) * 100d) / 100d;
         double mspt1min = Math.round(mspt.poll(MillisPerTick.MINUTES_1).percentile(0.9d) * 100d) / 100d;
 
         descBuilder
                 .append("\n> **Server MSPT** (`90%`)")
-                .append("\n\u2022 `10s: ").append(mspt10s).append("ms`")
-                .append("\n\u2022 `1min: ").append(mspt1min).append("ms`\n");
+                .append("\n- `10s: ").append(mspt10s).append("ms`")
+                .append("\n- `1min: ").append(mspt1min).append("ms`\n");
 
         int cpu10s = (int) Math.round(cpu.poll(CpuUsage.SECONDS_10) * 100d);
         int cpu1min = (int) Math.round(cpu.poll(CpuUsage.MINUTES_1) * 100d);
 
         descBuilder
                 .append("\n> **Process CPU Usage**")
-                .append("\n\u2022 `10s: ").append(cpu10s).append("%`")
-                .append("\n\u2022 `1min: ").append(cpu1min).append("%`\n");
+                .append("\n- `10s: ").append(cpu10s).append("%`")
+                .append("\n- `1min: ").append(cpu1min).append("%`\n");
 
         Color embedColor;
         if (tps10s >= 19d) { // 19-20 tps, good performance

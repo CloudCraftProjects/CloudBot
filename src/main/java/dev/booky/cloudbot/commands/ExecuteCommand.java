@@ -9,7 +9,7 @@ import discord4j.core.object.command.ApplicationCommandInteractionOptionValue;
 import discord4j.core.object.command.ApplicationCommandOption;
 import discord4j.core.object.entity.User;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
-import discord4j.discordjson.json.ApplicationCommandRequest;
+import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.rest.util.Permission;
 import discord4j.rest.util.PermissionSet;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -23,14 +23,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class ExecuteCommand implements BotCommand {
+public final class ExecuteCommand extends AbstractBotCommand {
 
     private static final SimpleDateFormat LOG_PREFIX = new SimpleDateFormat("HH:mm:ss");
 
+    public ExecuteCommand(CloudBotManager manager) {
+        super(manager, "execute");
+    }
+
     @Override
-    public ApplicationCommandRequest provideCommandData() {
-        return ApplicationCommandRequest.builder()
-                .name("execute")
+    protected void buildRequest(ImmutableApplicationCommandRequest.Builder builder) {
+        builder
                 .description("Execute a console command")
                 .descriptionLocalizationsOrNull(Map.of("de", "Führe einen Befehl in der Konsole aus"))
                 .defaultMemberPermissions(Long.toString(PermissionSet.of(Permission.ADMINISTRATOR).getRawValue()))
@@ -42,21 +45,20 @@ public class ExecuteCommand implements BotCommand {
                         .descriptionLocalizationsOrNull(Map.of("de", "Der Befehl, welcher ausgeführt werden soll"))
                         .type(ApplicationCommandOption.Type.STRING.getValue())
                         .required(true)
-                        .build())
-                .build();
+                        .build());
     }
 
     @Override
-    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
         String command = event.getOption("command")
                 .flatMap(ApplicationCommandInteractionOption::getValue)
                 .map(ApplicationCommandInteractionOptionValue::asString)
                 .orElseThrow();
 
-        event.reply("Executing command...").withEphemeral(true).subscribe();
-        Bukkit.getScheduler().runTask(manager.getPlugin(), () -> {
+        event.reply(i18n.apply("command.execute.executing")).withEphemeral(true).subscribe();
+        Bukkit.getScheduler().runTask(this.manager.getPlugin(), () -> {
             List<String> feedback = new ArrayList<>();
-            AtomicBoolean dirty = new AtomicBoolean();
+            AtomicBoolean updating = new AtomicBoolean();
 
             Bukkit.dispatchCommand(Bukkit.createCommandSender(msg -> {
                 String[] plainMsg = PlainTextComponentSerializer.plainText().serialize(msg).split("\n");
@@ -65,13 +67,21 @@ public class ExecuteCommand implements BotCommand {
                 for (String plainMsgPart : plainMsg) {
                     // nobody will know
                     plainMsgPart = plainMsgPart.replace("```", "´´´");
-                    feedback.add(currentTime + plainMsgPart);
+                    synchronized (feedback) {
+                        feedback.add(currentTime + plainMsgPart);
+                    }
                 }
 
-                if (!dirty.getAndSet(true)) {
-                    Bukkit.getScheduler().runTaskLaterAsynchronously(manager.getPlugin(), () ->
-                            event.editReply("```\n" + String.join("\n", feedback) + "\n```")
-                                    .block(), 20);
+                if (updating.compareAndSet(false, true)) {
+                    Bukkit.getScheduler().runTaskLaterAsynchronously(this.manager.getPlugin(), () -> {
+                        String content;
+                        synchronized (feedback) {
+                            content = String.join("\n", feedback);
+                        }
+                        updating.set(false);
+
+                        event.editReply("```\n" + content + "\n```").block();
+                    }, 20);
                 }
             }), command);
         });

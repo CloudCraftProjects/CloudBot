@@ -11,19 +11,22 @@ import discord4j.core.object.command.ApplicationCommandInteractionOptionValue;
 import discord4j.core.object.command.ApplicationCommandOption;
 import discord4j.core.object.entity.User;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
-import discord4j.discordjson.json.ApplicationCommandRequest;
+import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.rest.util.Permission;
 import discord4j.rest.util.PermissionSet;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
 
-public class WhitelistRemoveCommand implements BotCommand {
+public final class WhitelistRemoveCommand extends AbstractBotCommand {
+
+    public WhitelistRemoveCommand(CloudBotManager manager) {
+        super(manager, "whitelist-remove");
+    }
 
     @Override
-    public ApplicationCommandRequest provideCommandData() {
-        return ApplicationCommandRequest.builder()
-                .name("whitelist-remove")
+    protected void buildRequest(ImmutableApplicationCommandRequest.Builder builder) {
+        builder
                 .description("Remove someone from the whitelist of the minecraft server")
                 .descriptionLocalizationsOrNull(Map.of("de", "Entfernt jemanden von der Whitelist des Minecraft Servers"))
                 .defaultMemberPermissions(Long.toString(PermissionSet.of(Permission.MANAGE_MESSAGES).getRawValue()))
@@ -36,24 +39,23 @@ public class WhitelistRemoveCommand implements BotCommand {
                         .type(ApplicationCommandOption.Type.STRING.getValue())
                         .minLength(3).maxLength(16)
                         .required(true)
-                        .build())
-                .build();
+                        .build());
     }
 
     @Override
-    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
         String username = event.getOption("username")
                 .flatMap(ApplicationCommandInteractionOption::getValue)
                 .map(ApplicationCommandInteractionOptionValue::asString)
                 .orElseThrow();
 
         McApiUtil.McProfile profile = McApiUtil.loadProfile(username);
-        if (!manager.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
+        if (!this.manager.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
             return event.reply(i18n.apply("command.whitelist-remove.not-whitelisted",
                     "`" + MarkdownEscape.codeEscape(profile.getUsername()) + "`")).withEphemeral(true);
         }
 
-        manager.updateStorage(storage -> storage.getWhitelist().remove(profile.getUniqueId()));
+        this.manager.updateStorage(storage -> storage.getWhitelist().remove(profile.getUniqueId()));
         return event.reply(i18n.apply("command.whitelist-remove.success",
                 "`" + MarkdownEscape.codeEscape(profile.getUsername()) + "`")).withEphemeral(true);
     }

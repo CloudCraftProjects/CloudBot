@@ -6,7 +6,7 @@ import dev.booky.cloudbot.i18n.Translator;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.entity.User;
 import discord4j.core.spec.EmbedCreateSpec;
-import discord4j.discordjson.json.ApplicationCommandRequest;
+import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.rest.util.Color;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -16,20 +16,22 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-public class ListCommand implements BotCommand {
+public final class ListCommand extends AbstractBotCommand {
 
-    @Override
-    public ApplicationCommandRequest provideCommandData() {
-        return ApplicationCommandRequest.builder()
-                .name("list")
-                .description("Lists all players which are currently on the minecraft server")
-                .descriptionLocalizationsOrNull(Map.of("de", "Listet alle Spieler auf, die aktuell auf dem Minecraft Server sind"))
-                .dmPermission(true)
-                .build();
+    public ListCommand(CloudBotManager manager) {
+        super(manager, "list");
     }
 
     @Override
-    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    protected void buildRequest(ImmutableApplicationCommandRequest.Builder builder) {
+        builder
+                .description("Lists all players which are currently on the minecraft server")
+                .descriptionLocalizationsOrNull(Map.of("de", "Listet alle Spieler auf, die aktuell auf dem Minecraft Server sind"))
+                .dmPermission(true);
+    }
+
+    @Override
+    public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
         Set<Player> players = new HashSet<>(Bukkit.getOnlinePlayers());
         players.removeIf(player -> player.hasMetadata("vanished"));
 

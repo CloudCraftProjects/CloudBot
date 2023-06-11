@@ -1,7 +1,7 @@
 package dev.booky.cloudbot;
 // Created by booky10 in CloudBot (16:04 10.10.22)
 
-import dev.booky.cloudbot.commands.BotCommand;
+import dev.booky.cloudbot.commands.AbstractBotCommand;
 import dev.booky.cloudbot.commands.ExecuteCommand;
 import dev.booky.cloudbot.commands.ListCommand;
 import dev.booky.cloudbot.commands.PingCommand;
@@ -30,7 +30,6 @@ import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.User;
 import discord4j.core.object.entity.channel.TextChannel;
 import discord4j.core.spec.EmbedCreateSpec;
-import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.gateway.intent.Intent;
 import discord4j.gateway.intent.IntentSet;
 import discord4j.rest.service.ApplicationService;
@@ -48,7 +47,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -56,6 +55,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class CloudBotManager {
 
@@ -115,7 +116,9 @@ public class CloudBotManager {
         this.i18n.reload();
 
         if (this.gateway != null) {
-            this.reloadLogChannel();
+            this.reloadMainGuild().then()
+                    .and(this.reloadLogChannel())
+                    .subscribe();
         }
     }
 
@@ -124,31 +127,34 @@ public class CloudBotManager {
         ConfigLoader.saveObject(this.storagePath, this.getStorage(), FileType.JSON);
     }
 
-    public void reloadMainGuild() {
-        long guildId = this.getConfig().getMainGuildId();
-        if (guildId == -1L) {
-            this.mainGuild = null;
-            return;
-        }
-        this.mainGuild = this.gateway.getGuildById(Snowflake.of(guildId))
-                .blockOptional().orElse(null);
+    public Mono<Guild> reloadMainGuild() {
+        return Mono.defer(() -> {
+                    long guildId = this.getConfig().getMainGuildId();
+                    if (guildId != -1L) {
+                        return this.gateway.getGuildById(Snowflake.of(guildId));
+                    }
+                    return Mono.empty();
+                })
+                .doOnSuccess(guild -> this.mainGuild = guild);
     }
 
-    public void reloadLogChannel() {
-        if (this.mainGuild == null) {
-            this.reloadMainGuild();
-            if (this.mainGuild == null) {
-                return;
-            }
-        }
-
-        if (this.getConfig().getLogChannelId() == -1L) {
-            this.logChannel = null;
-            return;
-        }
-
-        this.logChannel = (TextChannel) this.mainGuild.getChannelById(Snowflake.of(this.getConfig().getLogChannelId()))
-                .blockOptional().filter(channel -> channel instanceof TextChannel).orElse(null);
+    public Mono<TextChannel> reloadLogChannel() {
+        return Mono.defer(() -> {
+                    if (this.mainGuild == null) {
+                        return this.reloadMainGuild();
+                    }
+                    return Mono.just(this.mainGuild);
+                })
+                .flatMap(guild -> {
+                    long channelId = this.getConfig().getLogChannelId();
+                    if (channelId != -1L) {
+                        return guild.getChannelById(Snowflake.of(channelId))
+                                .filter(channel -> channel instanceof TextChannel)
+                                .map(channel -> (TextChannel) channel);
+                    }
+                    return Mono.empty();
+                })
+                .doOnSuccess(channel -> this.logChannel = channel);
     }
 
     public void startBot() {
@@ -156,92 +162,88 @@ public class CloudBotManager {
                 .setDefaultAllowedMentions(AllowedMentions.suppressAll())
                 .build();
 
-        Set<BotCommand> commands = new HashSet<>();
-        commands.add(new ExecuteCommand());
-        commands.add(new ListCommand());
-        commands.add(new PingCommand());
-        commands.add(new PluginsCommand());
-        commands.add(new TeamMembersCommand());
-        commands.add(new UserInfoCommand());
-        commands.add(new WhitelistCommand());
-        commands.add(new WhitelistRemoveCommand());
+        Set<AbstractBotCommand> commands = new HashSet<>();
+        commands.add(new ExecuteCommand(this));
+        commands.add(new ListCommand(this));
+        commands.add(new PingCommand(this));
+        commands.add(new PluginsCommand(this));
+        commands.add(new TeamMembersCommand(this));
+        commands.add(new UserInfoCommand(this));
+        commands.add(new WhitelistCommand(this));
+        commands.add(new WhitelistRemoveCommand(this));
 
         if (Bukkit.getPluginManager().getPlugin("spark") != null) {
-            commands.add(new TpsCommand());
+            commands.add(new TpsCommand(this));
         }
 
         Mono<Void> login = client.gateway()
                 .setEnabledIntents(IntentSet.of(Intent.GUILD_MEMBERS))
                 .withGateway(gateway -> {
                     this.gateway = gateway;
-                    this.reloadLogChannel();
 
-                    long appId = gateway.getRestClient().getApplicationId().blockOptional().orElseThrow();
-                    ApplicationService appService = gateway.getRestClient().getApplicationService();
+                    return this.reloadLogChannel().then()
+                            .and(Mono.defer(() -> {
+                                long appId = gateway.getRestClient().getApplicationId().blockOptional().orElseThrow();
+                                ApplicationService appService = gateway.getRestClient().getApplicationService();
 
-                    this.plugin.getLogger().info("Unregistering existing commands...");
-                    // delete existing (potentially unused) commands
-                    appService.getGlobalApplicationCommands(appId)
-                            .collectList().blockOptional().orElseThrow()
-                            .forEach(cmd -> {
-                                appService.deleteGlobalApplicationCommand(appId, cmd.id().asLong()).block();
-                                this.plugin.getLogger().info("Unregistered command '" + cmd.name() + "'");
-                            });
-
-                    this.plugin.getLogger().info("Registering " + commands.size() + " new commands...");
-                    Map<String, BotCommand> commandMap = new HashMap<>(commands.size());
-                    for (BotCommand command : commands) {
-                        ApplicationCommandRequest req = command.provideCommandData();
-                        commandMap.put(req.name(), command);
-
-                        appService.createGlobalApplicationCommand(appId, req).block();
-                        this.plugin.getLogger().info("Registered command '" + req.name() + "'");
-                    }
-
-                    this.plugin.getLogger().info("Finished startup, starting to listen for events...");
-                    return gateway.on(GuildCreateEvent.class, event -> {
-                        if (event.getGuild().getId().asLong() == this.getConfig().getMainGuildId()) {
-                            this.mainGuild = event.getGuild();
-                            this.reloadLogChannel();
-                        }
-                        return Mono.empty();
-                    }).then().and(gateway.on(ChatInputInteractionEvent.class, event -> {
-                        User user = event.getInteraction().getUser();
-                        CompletableFuture<Message> logMessage = new CompletableFuture<>();
-
-                        if (this.logChannel != null) {
-                            Optional<Snowflake> guildId = event.getInteraction().getGuildId();
-                            String location = guildId.map(snowflake -> "Guild: `" + snowflake.asString() + "`\n" +
-                                            "Channel: `" + event.getInteraction().getChannelId().asString() + "`")
-                                    .orElseGet(() -> "Private Messages: `" + event.getInteraction().getChannelId().asString() + "`")
-                                    + "\n";
-
-                            String desc = "**" + MarkdownEscape.escape(user.getTag()) + "** (`" + user.getId().asString() + ")`\n" +
-                                    location + "> " + CommandStringifier.stringify(event);
-
-                            this.logChannel.createMessage().withEmbeds(EmbedCreateSpec.builder()
-                                            .description(desc).color(Color.of(0xA9F90F))
-                                            .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
-                                            .build())
-                                    .subscribe(logMessage::complete);
-                        }
-
-                        BotCommand command = commandMap.get(event.getCommandName());
-                        if (command == null) {
-                            return event.reply(this.i18n.translate("command.not-found", event)).withEphemeral(true);
-                        }
-
-                        try {
-                            Translator translator = (key, args) -> this.i18n.translate(key, event, args);
-                            return command.run(this, event.getCommandName(), event, user, translator)
-                                    .onErrorResume(throwable -> this.handleException(throwable, event, logMessage));
-                        } catch (Throwable throwable) {
-                            return this.handleException(throwable, event, logMessage);
-                        }
-                    }).then());
+                                this.plugin.getLogger().info("Registering " + commands.size() + " commands...");
+                                return appService.bulkOverwriteGlobalApplicationCommand(appId,
+                                                commands.stream().map(AbstractBotCommand::buildRequest).toList())
+                                        .collectList().then();
+                            })).then()
+                            .and(Mono.defer(() -> {
+                                this.plugin.getLogger().info("Finished startup, listening for events...");
+                                return this.registerEvents(gateway, commands);
+                            })).then();
                 });
 
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> login.block());
+    }
+
+    private Mono<Void> registerEvents(GatewayDiscordClient gateway, Collection<AbstractBotCommand> commands) {
+        Map<String, AbstractBotCommand> commandMap = commands.stream()
+                .collect(Collectors.toUnmodifiableMap(AbstractBotCommand::getLabel, Function.identity()));
+
+        return gateway.on(GuildCreateEvent.class, event -> {
+            if (event.getGuild().getId().asLong() == this.getConfig().getMainGuildId()) {
+                this.mainGuild = event.getGuild();
+                return this.reloadLogChannel();
+            }
+            return Mono.empty();
+        }).then().and(gateway.on(ChatInputInteractionEvent.class, event -> {
+            User user = event.getInteraction().getUser();
+            CompletableFuture<Message> logMessage = new CompletableFuture<>();
+
+            if (this.logChannel != null) {
+                Optional<Snowflake> guildId = event.getInteraction().getGuildId();
+                String location = guildId.map(snowflake -> "Guild: `" + snowflake.asString() + "`\n" +
+                                "Channel: `" + event.getInteraction().getChannelId().asString() + "`")
+                        .orElseGet(() -> "Private Messages: `" + event.getInteraction().getChannelId().asString() + "`")
+                        + "\n";
+
+                String desc = "**" + MarkdownEscape.escape(user.getTag()) + "** (`" + user.getId().asString() + ")`\n" +
+                        location + "> " + CommandStringifier.stringify(event);
+
+                this.logChannel.createMessage().withEmbeds(EmbedCreateSpec.builder()
+                                .description(desc).color(Color.of(0xA9F90F))
+                                .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
+                                .build())
+                        .subscribe(logMessage::complete);
+            }
+
+            AbstractBotCommand command = commandMap.get(event.getCommandName());
+            if (command == null) {
+                return event.reply(this.i18n.translate("command.not-found", event)).withEphemeral(true);
+            }
+
+            try {
+                Translator translator = (key, args) -> this.i18n.translate(key, event, args);
+                return command.run(event, user, translator)
+                        .onErrorResume(throwable -> this.handleException(throwable, event, logMessage));
+            } catch (Throwable throwable) {
+                return this.handleException(throwable, event, logMessage);
+            }
+        }).then());
     }
 
     private Mono<Void> handleException(Throwable throwable,

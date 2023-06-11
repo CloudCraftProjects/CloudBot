@@ -13,7 +13,7 @@ import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.User;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
-import discord4j.discordjson.json.ApplicationCommandRequest;
+import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.Permission;
 import reactor.core.publisher.Mono;
@@ -25,14 +25,17 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class WhitelistCommand implements BotCommand {
+public final class WhitelistCommand extends AbstractBotCommand {
 
     private final ReentrantLock listLock = new ReentrantLock();
 
+    public WhitelistCommand(CloudBotManager manager) {
+        super(manager, "whitelist");
+    }
+
     @Override
-    public ApplicationCommandRequest provideCommandData() {
-        return ApplicationCommandRequest.builder()
-                .name("whitelist")
+    protected void buildRequest(ImmutableApplicationCommandRequest.Builder builder) {
+        builder
                 .description("Access and modify the whitelist on the minecraft server")
                 .descriptionLocalizationsOrNull(Map.of("de", "Lässt dich auf die Whitelist des Minecraft Servers zugreifen und bearbeiten"))
                 .dmPermission(false)
@@ -56,14 +59,13 @@ public class WhitelistCommand implements BotCommand {
                         .description("Lists all currently whitelisted players")
                         .descriptionLocalizationsOrNull(Map.of("de", "Listet alle Spieler auf, die sich auf der Whitelist befinden"))
                         .type(ApplicationCommandOption.Type.SUB_COMMAND.getValue())
-                        .build())
-                .build();
+                        .build());
     }
 
     @Override
-    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
         if (event.getOption("list").isPresent()) {
-            return event.deferReply().withEphemeral(true).then(Mono.fromRunnable(() -> {
+            return event.deferReply().withEphemeral(true).then(Mono.defer(() -> {
                 this.listLock.lock();
 
                 try {
@@ -96,15 +98,15 @@ public class WhitelistCommand implements BotCommand {
                                 "`" + MarkdownEscape.codeEscape(throwable.toString()) + "`"));
                     }
 
-                    event.createFollowup()
+                    return event.createFollowup()
                             .withEmbeds(EmbedCreateSpec.builder()
                                     .title(i18n.apply("command.whitelist.list.success", playerIds.size()))
                                     .description(builder.toString())
                                     .color(Color.CYAN)
                                     .build())
-                            .block();
+                            .then();
                 } finally {
-                    listLock.unlock();
+                    this.listLock.unlock();
                 }
             }));
         }
@@ -122,11 +124,11 @@ public class WhitelistCommand implements BotCommand {
 
         try {
             McApiUtil.McProfile profile = McApiUtil.loadProfile(username);
-            if (manager.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
+            if (this.manager.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
                 return event.reply(i18n.apply("command.whitelist.add.error.mc-already-whitelisted",
                         "`" + MarkdownEscape.codeEscape(profile.getUsername()) + "`"));
             }
-            if (manager.getStorage().getWhitelist().containsValue(user.getId().asLong())) {
+            if (this.manager.getStorage().getWhitelist().containsValue(user.getId().asLong())) {
                 boolean bypass = event.getInteraction().getGuildId()
                         .map(user::asMember).flatMap(Mono::blockOptional)
                         .map(Member::getBasePermissions).flatMap(Mono::blockOptional)
@@ -138,7 +140,7 @@ public class WhitelistCommand implements BotCommand {
                 }
             }
 
-            manager.updateStorage(storage -> storage.getWhitelist().put(profile.getUniqueId(), user.getId().asLong()));
+            this.manager.updateStorage(storage -> storage.getWhitelist().put(profile.getUniqueId(), user.getId().asLong()));
             return event.reply().withEmbeds(EmbedCreateSpec.builder()
                     .color(Color.GREEN).title(i18n.apply("command.whitelist.add.success.title"))
                     .description(i18n.apply("command.whitelist.add.success.description", user.getMention(),

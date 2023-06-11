@@ -6,26 +6,28 @@ import dev.booky.cloudbot.i18n.Translator;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.entity.User;
 import discord4j.core.spec.EmbedCreateSpec;
-import discord4j.discordjson.json.ApplicationCommandRequest;
+import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.rest.util.Color;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
 
-public class PingCommand implements BotCommand {
+public final class PingCommand extends AbstractBotCommand {
 
-    @Override
-    public ApplicationCommandRequest provideCommandData() {
-        return ApplicationCommandRequest.builder()
-                .name("ping")
-                .description("Checks and prints the latency to the discord api")
-                .descriptionLocalizationsOrNull(Map.of("de", "Überprüft und gibt die Latenz zur Discord API aus"))
-                .dmPermission(true)
-                .build();
+    public PingCommand(CloudBotManager manager) {
+        super(manager, "ping");
     }
 
     @Override
-    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    protected void buildRequest(ImmutableApplicationCommandRequest.Builder builder) {
+        builder
+                .description("Checks and prints the latency to the discord api")
+                .descriptionLocalizationsOrNull(Map.of("de", "Überprüft und gibt die Latenz zur Discord API aus"))
+                .dmPermission(true);
+    }
+
+    @Override
+    public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
         long start = System.currentTimeMillis();
         return event.reply()
                 .withEphemeral(true)

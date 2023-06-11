@@ -6,7 +6,7 @@ import dev.booky.cloudbot.i18n.Translator;
 import dev.booky.cloudbot.util.MarkdownEscape;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.entity.User;
-import discord4j.discordjson.json.ApplicationCommandRequest;
+import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import reactor.core.publisher.Mono;
@@ -18,24 +18,26 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 
-public class PluginsCommand implements BotCommand {
+public final class PluginsCommand extends AbstractBotCommand {
 
     private static final String PLUGINS_FORMAT = "Plugins (%d): ";
     private static final String PLUGIN_WITH_SITE_FORMAT = "[%s](<%3$2s>) (`v%2$2s`)";
     private static final String PLUGIN_NO_SITE_FORMAT = "%s (`v%s`)";
 
-    @Override
-    public ApplicationCommandRequest provideCommandData() {
-        return ApplicationCommandRequest.builder()
-                .name("plugins")
-                .description("Lists the plugins currently active on the server")
-                .descriptionLocalizationsOrNull(Map.of("de", "Listet die aktuell aktivierten Plugins auf dem Server auf"))
-                .dmPermission(true)
-                .build();
+    public PluginsCommand(CloudBotManager manager) {
+        super(manager, "plugins");
     }
 
     @Override
-    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    protected void buildRequest(ImmutableApplicationCommandRequest.Builder builder) {
+        builder
+                .description("Lists the plugins currently active on the server")
+                .descriptionLocalizationsOrNull(Map.of("de", "Listet die aktuell aktivierten Plugins auf dem Server auf"))
+                .dmPermission(true);
+    }
+
+    @Override
+    public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
         Set<Plugin> plugins = new HashSet<>(List.of(Bukkit.getPluginManager().getPlugins()));
         plugins.removeIf(Predicate.not(Plugin::isEnabled));
 
