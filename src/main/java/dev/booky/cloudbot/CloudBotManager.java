@@ -304,13 +304,15 @@ public class CloudBotManager {
             return Mono.empty();
         })).then().and(gateway.on(MemberJoinEvent.class, event -> {
             if (event.getGuildId().asLong() == this.getConfig().getMainGuildId()) {
-                return this.checkInvites(event.getMember()).then()
-                        .and(this.updateMemberCounter(this.memberCounterChannel));
+                return this.sendRandomMessage(event.getMember(), this.getConfig().getJoinMessages()).then()
+                        .and(this.checkInvites(event.getMember())).then()
+                        .and(this.updateMemberCounter(this.memberCounterChannel)).then();
             }
             return Mono.empty();
         })).then().and(gateway.on(MemberLeaveEvent.class, event -> {
             if (event.getGuildId().asLong() == this.getConfig().getMainGuildId()) {
-                return this.updateMemberCounter(this.memberCounterChannel);
+                return this.sendRandomMessage(event.getMember().orElse(null), this.getConfig().getLeaveMessages()).then()
+                        .and(this.updateMemberCounter(this.memberCounterChannel)).then();
             }
             return Mono.empty();
         })).then().and(gateway.on(ChatInputInteractionEvent.class, event -> {
@@ -388,6 +390,24 @@ public class CloudBotManager {
 
         return event.createFollowup(this.i18n.translate("command.errored", event,
                 "`" + MarkdownEscape.codeEscape(throwable.toString()) + "`")).then();
+    }
+
+    private Mono<Void> sendRandomMessage(@Nullable Member member, CloudBotConfig.RandomMessages msgCfg) {
+        if (member == null || this.mainGuild == null || msgCfg.getChannelId() == -1L) {
+            return Mono.empty();
+        }
+
+        String msg = msgCfg.getMessage();
+        if (msg == null) {
+            return Mono.empty();
+        }
+
+        return this.mainGuild.getChannelById(Snowflake.of(msgCfg.getChannelId()))
+                .filter(channel -> channel instanceof TextChannel)
+                .map(channel -> (TextChannel) channel)
+                .flatMap(channel -> channel.createMessage(msg.formatted(member.getMention()))
+                        .withAllowedMentions(AllowedMentions.builder().allowUser(member.getId()).build()))
+                .then();
     }
 
     private Mono<Void> checkInvites(Member member) {

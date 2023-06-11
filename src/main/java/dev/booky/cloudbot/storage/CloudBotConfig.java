@@ -4,6 +4,9 @@ package dev.booky.cloudbot.storage;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.configurate.objectmapping.ConfigSerializable;
 
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+
 @SuppressWarnings("FieldMayBeFinal") // configurate
 @ConfigSerializable
 public class CloudBotConfig {
@@ -42,6 +45,32 @@ public class CloudBotConfig {
         }
     }
 
+    private RandomMessages joinMessages = new RandomMessages();
+    private RandomMessages leaveMessages = new RandomMessages();
+
+    @ConfigSerializable
+    public static final class RandomMessages {
+
+        private long channelId = -1L;
+        private List<String> messages = List.of();
+
+        private RandomMessages() {
+        }
+
+        public @Nullable String getMessage() {
+            if (this.messages.isEmpty()) {
+                return null;
+            }
+
+            int randomIndex = ThreadLocalRandom.current().nextInt(this.messages.size());
+            return this.messages.get(randomIndex);
+        }
+
+        public long getChannelId() {
+            return this.channelId;
+        }
+    }
+
     @SuppressWarnings("unused") // configurate
     private CloudBotConfig() {
     }
@@ -72,5 +101,13 @@ public class CloudBotConfig {
 
     public MemberCounter getMemberCounter() {
         return this.memberCounter;
+    }
+
+    public RandomMessages getJoinMessages() {
+        return this.joinMessages;
+    }
+
+    public RandomMessages getLeaveMessages() {
+        return this.leaveMessages;
     }
 }
