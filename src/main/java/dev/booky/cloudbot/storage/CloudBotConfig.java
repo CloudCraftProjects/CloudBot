@@ -9,11 +9,38 @@ import org.spongepowered.configurate.objectmapping.ConfigSerializable;
 public class CloudBotConfig {
 
     private String token = "REPLACE_ME";
-    private String inviteLink = "null";
+
     private boolean whitelistActive = true;
+    private String inviteLink = "null";
+
     private long mainGuildId = -1L;
     private long logChannelId = -1L;
     private long teamRoleId = -1L;
+
+    private MemberCounter memberCounter = new MemberCounter();
+
+    @ConfigSerializable
+    public static final class MemberCounter {
+
+        private long channelId = -1L;
+        private boolean excludeBots = true;
+        private String format = "\uD83C\uDF0E\u2502Members: %s";
+
+        private MemberCounter() {
+        }
+
+        public long getChannelId() {
+            return this.channelId;
+        }
+
+        public boolean isExcludeBots() {
+            return this.excludeBots;
+        }
+
+        public String getFormat() {
+            return this.format;
+        }
+    }
 
     @SuppressWarnings("unused") // configurate
     private CloudBotConfig() {
@@ -23,12 +50,12 @@ public class CloudBotConfig {
         return this.token;
     }
 
-    public @Nullable String getInviteLink() {
-        return "null".equals(this.inviteLink) ? null : this.inviteLink;
-    }
-
     public boolean isWhitelistActive() {
         return whitelistActive;
+    }
+
+    public @Nullable String getInviteLink() {
+        return "null".equals(this.inviteLink) ? null : this.inviteLink;
     }
 
     public long getMainGuildId() {
@@ -41,5 +68,9 @@ public class CloudBotConfig {
 
     public long getTeamRoleId() {
         return this.teamRoleId;
+    }
+
+    public MemberCounter getMemberCounter() {
+        return this.memberCounter;
     }
 }

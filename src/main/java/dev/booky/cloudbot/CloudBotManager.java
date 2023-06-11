@@ -24,12 +24,20 @@ import discord4j.core.DiscordClient;
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.guild.GuildCreateEvent;
+import discord4j.core.event.domain.guild.MemberJoinEvent;
+import discord4j.core.event.domain.guild.MemberLeaveEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.entity.Guild;
+import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.User;
+import discord4j.core.object.entity.channel.Channel;
+import discord4j.core.object.entity.channel.GuildChannel;
 import discord4j.core.object.entity.channel.TextChannel;
+import discord4j.core.object.entity.channel.VoiceChannel;
 import discord4j.core.spec.EmbedCreateSpec;
+import discord4j.core.spec.TextChannelEditMono;
+import discord4j.core.spec.VoiceChannelEditMono;
 import discord4j.gateway.intent.Intent;
 import discord4j.gateway.intent.IntentSet;
 import discord4j.rest.service.ApplicationService;
@@ -56,6 +64,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class CloudBotManager {
@@ -80,6 +89,7 @@ public class CloudBotManager {
     private GatewayDiscordClient gateway;
     private Guild mainGuild;
     private TextChannel logChannel;
+    private GuildChannel memberCounterChannel;
 
     private CloudBotStorage storage;
     private CloudBotConfig config;
@@ -117,7 +127,8 @@ public class CloudBotManager {
 
         if (this.gateway != null) {
             this.reloadMainGuild().then()
-                    .and(this.reloadLogChannel())
+                    .and(this.reloadLogChannel()).then()
+                    .and(this.reloadMemberCounterChannel())
                     .subscribe();
         }
     }
@@ -138,13 +149,17 @@ public class CloudBotManager {
                 .doOnSuccess(guild -> this.mainGuild = guild);
     }
 
-    public Mono<TextChannel> reloadLogChannel() {
+    public Mono<Guild> getOrLoadMainGuild() {
         return Mono.defer(() -> {
-                    if (this.mainGuild == null) {
-                        return this.reloadMainGuild();
-                    }
-                    return Mono.just(this.mainGuild);
-                })
+            if (this.mainGuild == null) {
+                return this.reloadMainGuild();
+            }
+            return Mono.just(this.mainGuild);
+        });
+    }
+
+    public Mono<TextChannel> reloadLogChannel() {
+        return this.getOrLoadMainGuild()
                 .flatMap(guild -> {
                     long channelId = this.getConfig().getLogChannelId();
                     if (channelId != -1L) {
@@ -155,6 +170,21 @@ public class CloudBotManager {
                     return Mono.empty();
                 })
                 .doOnSuccess(channel -> this.logChannel = channel);
+    }
+
+    public Mono<GuildChannel> reloadMemberCounterChannel() {
+        return this.getOrLoadMainGuild()
+                .flatMap(guild -> {
+                    long channelId = this.getConfig().getMemberCounter().getChannelId();
+                    if (channelId != -1L) {
+                        return guild.getChannelById(Snowflake.of(channelId));
+                    }
+                    return Mono.empty();
+                })
+                .doOnSuccess(channel -> {
+                    this.memberCounterChannel = channel;
+                    this.updateMemberCounter(channel).subscribe();
+                });
     }
 
     public void startBot() {
@@ -182,6 +212,7 @@ public class CloudBotManager {
                     this.gateway = gateway;
 
                     return this.reloadLogChannel().then()
+                            .and(this.reloadMemberCounterChannel()).then()
                             .and(Mono.defer(() -> {
                                 long appId = gateway.getRestClient().getApplicationId().blockOptional().orElseThrow();
                                 ApplicationService appService = gateway.getRestClient().getApplicationService();
@@ -207,10 +238,21 @@ public class CloudBotManager {
         return gateway.on(GuildCreateEvent.class, event -> {
             if (event.getGuild().getId().asLong() == this.getConfig().getMainGuildId()) {
                 this.mainGuild = event.getGuild();
-                return this.reloadLogChannel();
+                return this.reloadLogChannel().then()
+                        .and(this.reloadMemberCounterChannel()).then();
             }
             return Mono.empty();
-        }).then().and(gateway.on(ChatInputInteractionEvent.class, event -> {
+        }).then().and(gateway.on(MemberJoinEvent.class, event -> {
+            if (event.getGuildId().asLong() == this.getConfig().getMainGuildId()) {
+                return this.updateMemberCounter(this.memberCounterChannel);
+            }
+            return Mono.empty();
+        })).then().and(gateway.on(MemberLeaveEvent.class, event -> {
+            if (event.getGuildId().asLong() == this.getConfig().getMainGuildId()) {
+                return this.updateMemberCounter(this.memberCounterChannel);
+            }
+            return Mono.empty();
+        })).then().and(gateway.on(ChatInputInteractionEvent.class, event -> {
             User user = event.getInteraction().getUser();
             CompletableFuture<Message> logMessage = new CompletableFuture<>();
 
@@ -287,6 +329,39 @@ public class CloudBotManager {
                 "`" + MarkdownEscape.codeEscape(throwable.toString()) + "`")).then();
     }
 
+    private Mono<Void> updateMemberCounter(GuildChannel channel) {
+        // only voice + text channels are supported
+        if (channel == null || (channel.getType() != Channel.Type.GUILD_VOICE
+                && channel.getType() != Channel.Type.GUILD_TEXT)) {
+            return Mono.empty();
+        }
+
+        CloudBotConfig.MemberCounter counterCfg = this.getConfig().getMemberCounter();
+        return channel.getGuild()
+                .flatMap(guild -> {
+                    if (counterCfg.isExcludeBots()) {
+                        // need to fetch all members and then count the non-bots,
+                        // can't do this without requesting a lot
+                        return guild.getMembers()
+                                .filter(Predicate.not(Member::isBot))
+                                .count();
+                    }
+                    return Mono.just(guild.getMemberCount());
+                })
+                .map(count -> counterCfg.getFormat().formatted(count.intValue()))
+                .filter(name -> !channel.getName().equals(name))
+                .flatMap(name -> {
+                    if (channel.getType() == Channel.Type.GUILD_VOICE) {
+                        return VoiceChannelEditMono.of((VoiceChannel) channel).withName(name);
+                    }
+                    if (channel.getType() == Channel.Type.GUILD_TEXT) {
+                        return TextChannelEditMono.of((TextChannel) channel).withName(name);
+                    }
+                    throw new AssertionError();
+                })
+                .then();
+    }
+
     public void shutdownBot() {
         if (this.gateway != null) {
             this.gateway.logout().block();
@@ -302,12 +377,16 @@ public class CloudBotManager {
         return Objects.requireNonNull(this.storage, "Storage has not been loaded yet");
     }
 
+    public @Nullable Guild getMainGuild() {
+        return this.mainGuild;
+    }
+
     public @Nullable TextChannel getLogChannel() {
         return this.logChannel;
     }
 
-    public @Nullable Guild getMainGuild() {
-        return this.mainGuild;
+    public @Nullable GuildChannel getMemberCounterChannel() {
+        return this.memberCounterChannel;
     }
 
     public Plugin getPlugin() {

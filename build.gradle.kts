@@ -17,7 +17,7 @@ repositories {
 }
 
 val configurateVersion = "4.1.2"
-val discord4jVersion = "3.2.4"
+val discord4jVersion = "3.3.0-M1"
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.20-R0.1-SNAPSHOT")
