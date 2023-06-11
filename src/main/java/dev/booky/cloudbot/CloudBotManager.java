@@ -4,6 +4,7 @@ package dev.booky.cloudbot;
 import dev.booky.cloudbot.commands.BotCommand;
 import dev.booky.cloudbot.commands.ExecuteCommand;
 import dev.booky.cloudbot.commands.ListCommand;
+import dev.booky.cloudbot.commands.PingCommand;
 import dev.booky.cloudbot.commands.PluginsCommand;
 import dev.booky.cloudbot.commands.TpsCommand;
 import dev.booky.cloudbot.commands.UserInfoCommand;
@@ -28,8 +29,10 @@ import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.User;
 import discord4j.core.object.entity.channel.TextChannel;
 import discord4j.core.spec.EmbedCreateSpec;
+import discord4j.discordjson.json.ApplicationCommandData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.gateway.intent.IntentSet;
+import discord4j.rest.service.ApplicationService;
 import discord4j.rest.util.AllowedMentions;
 import discord4j.rest.util.Color;
 import net.kyori.adventure.text.Component;
@@ -145,9 +148,10 @@ public class CloudBotManager {
 
         Set<BotCommand> commands = new HashSet<>();
         commands.add(new ExecuteCommand());
-        commands.add(new UserInfoCommand());
-        commands.add(new PluginsCommand());
         commands.add(new ListCommand());
+        commands.add(new PingCommand());
+        commands.add(new PluginsCommand());
+        commands.add(new UserInfoCommand());
         commands.add(new WhitelistCommand());
         commands.add(new WhitelistRemoveCommand());
 
@@ -160,13 +164,22 @@ public class CloudBotManager {
             this.reloadLogChannel(null);
 
             long appId = gateway.getRestClient().getApplicationId().blockOptional().orElseThrow();
+            ApplicationService appService = gateway.getRestClient().getApplicationService();
+
+            // delete existing (potentially unused) commands
+            appService
+                    .getGlobalApplicationCommands(appId)
+                    .map(ApplicationCommandData::id)
+                    .flatMap(cmdId -> appService.deleteGlobalApplicationCommand(appId, cmdId.asLong()))
+                    .collectList()
+                    .block();
+
             Map<String, BotCommand> commandMap = new HashMap<>(commands.size());
             for (BotCommand command : commands) {
                 ApplicationCommandRequest req = command.provideCommandData();
                 commandMap.put(req.name(), command);
 
-                gateway.getRestClient().getApplicationService()
-                        .createGlobalApplicationCommand(appId, req).block();
+                appService.createGlobalApplicationCommand(appId, req).block();
             }
 
             return gateway.on(GuildCreateEvent.class, event -> {
