@@ -6,11 +6,11 @@ import dev.booky.cloudbot.i18n.Translator;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.entity.User;
 import discord4j.discordjson.json.ApplicationCommandRequest;
-import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 public interface BotCommand {
 
     ApplicationCommandRequest provideCommandData();
 
-    Publisher<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n);
+    Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n);
 }

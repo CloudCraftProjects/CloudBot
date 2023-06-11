@@ -8,7 +8,6 @@ import discord4j.core.object.entity.User;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.rest.util.Color;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
@@ -26,7 +25,7 @@ public class PingCommand implements BotCommand {
     }
 
     @Override
-    public Publisher<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
         long start = System.currentTimeMillis();
         return event.reply()
                 .withEphemeral(true)

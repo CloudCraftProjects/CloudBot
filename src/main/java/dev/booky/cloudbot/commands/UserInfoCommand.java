@@ -22,7 +22,6 @@ import discord4j.rest.util.PermissionSet;
 import org.bukkit.BanEntry;
 import org.bukkit.BanList;
 import org.bukkit.Bukkit;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -77,7 +76,7 @@ public class UserInfoCommand implements BotCommand {
     }
 
     @Override
-    public Publisher<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
         if (event.getOption("discord").isPresent()) {
             User target = event.getOption("discord")
                     .flatMap(option -> option.getOption("user"))
@@ -97,7 +96,7 @@ public class UserInfoCommand implements BotCommand {
         return showMinecraftInfo(manager, event, user, target);
     }
 
-    private Publisher<Void> showMinecraftInfo(CloudBotManager manager, ChatInputInteractionEvent event, User user, McProfile targetProfile) {
+    private Mono<Void> showMinecraftInfo(CloudBotManager manager, ChatInputInteractionEvent event, User user, McProfile targetProfile) {
         Long targetId = manager.getStorage().getWhitelist().get(targetProfile.getUniqueId());
         if (targetId == null) {
             throw new IllegalStateException("User '" + targetProfile.getUsername() + "' is not on whitelist");
@@ -111,7 +110,7 @@ public class UserInfoCommand implements BotCommand {
         return showDiscordInfo(manager, event, user, target);
     }
 
-    private Publisher<Void> showDiscordInfo(CloudBotManager manager, ChatInputInteractionEvent event, User user, User target) {
+    private Mono<Void> showDiscordInfo(CloudBotManager manager, ChatInputInteractionEvent event, User user, User target) {
         Optional<Member> optMember = target.asMember(event.getInteraction().getGuildId().orElseThrow()).blockOptional();
         Optional<String> guildAvatar = optMember.flatMap(member -> member.getGuildAvatarUrl(member.hasAnimatedGuildAvatar() ? GIF : PNG));
         Optional<String> nickname = optMember.flatMap(Member::getNickname).map(MarkdownEscape::codeEscape);

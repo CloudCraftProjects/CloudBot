@@ -17,6 +17,7 @@ import me.lucko.spark.api.statistic.misc.DoubleAverageInfo;
 import me.lucko.spark.api.statistic.types.DoubleStatistic;
 import me.lucko.spark.api.statistic.types.GenericStatistic;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.Map;
@@ -35,7 +36,7 @@ public class TpsCommand implements BotCommand {
     }
 
     @Override
-    public Publisher<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
         Spark spark = SparkProvider.get();
         StringBuilder descBuilder = new StringBuilder();
 

@@ -14,7 +14,6 @@ import discord4j.rest.util.Permission;
 import discord4j.rest.util.PermissionSet;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import java.text.SimpleDateFormat;
@@ -48,7 +47,7 @@ public class ExecuteCommand implements BotCommand {
     }
 
     @Override
-    public Publisher<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
         String command = event.getOption("command")
                 .flatMap(ApplicationCommandInteractionOption::getValue)
                 .map(ApplicationCommandInteractionOptionValue::asString)

@@ -31,6 +31,7 @@ import discord4j.core.object.entity.channel.TextChannel;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.discordjson.json.ApplicationCommandData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
+import discord4j.gateway.intent.Intent;
 import discord4j.gateway.intent.IntentSet;
 import discord4j.rest.service.ApplicationService;
 import discord4j.rest.util.AllowedMentions;
@@ -76,6 +77,7 @@ public class CloudBotManager {
     private final Plugin plugin;
 
     private GatewayDiscordClient gateway;
+    private Guild mainGuild;
     private TextChannel logChannel;
 
     private CloudBotStorage storage;
@@ -113,7 +115,7 @@ public class CloudBotManager {
         this.i18n.reload();
 
         if (this.gateway != null) {
-            this.reloadLogChannel(null);
+            this.reloadLogChannel();
         }
     }
 
@@ -122,22 +124,30 @@ public class CloudBotManager {
         ConfigLoader.saveObject(this.storagePath, this.getStorage(), FileType.JSON);
     }
 
-    public void reloadLogChannel(@Nullable Guild guild) {
-        if (this.getConfig().getMainGuildId() == -1L) {
+    public void reloadMainGuild() {
+        long guildId = this.getConfig().getMainGuildId();
+        if (guildId == -1L) {
+            this.mainGuild = null;
             return;
         }
-        if (this.getConfig().getLogChannelId() == -1L) {
-            return;
-        }
+        this.mainGuild = this.gateway.getGuildById(Snowflake.of(guildId))
+                .blockOptional().orElse(null);
+    }
 
-        if (guild == null) {
-            guild = this.gateway.getGuildById(Snowflake.of(this.getConfig().getMainGuildId())).blockOptional().orElse(null);
-            if (guild == null) {
+    public void reloadLogChannel() {
+        if (this.mainGuild == null) {
+            this.reloadMainGuild();
+            if (this.mainGuild == null) {
                 return;
             }
         }
 
-        this.logChannel = (TextChannel) guild.getChannelById(Snowflake.of(this.getConfig().getLogChannelId()))
+        if (this.getConfig().getLogChannelId() == -1L) {
+            this.logChannel = null;
+            return;
+        }
+
+        this.logChannel = (TextChannel) this.mainGuild.getChannelById(Snowflake.of(this.getConfig().getLogChannelId()))
                 .blockOptional().filter(channel -> channel instanceof TextChannel).orElse(null);
     }
 
@@ -159,105 +169,116 @@ public class CloudBotManager {
             commands.add(new TpsCommand());
         }
 
-        Mono<Void> login = client.gateway().setEnabledIntents(IntentSet.none()).withGateway(gateway -> {
-            this.gateway = gateway;
-            this.reloadLogChannel(null);
+        Mono<Void> login = client.gateway()
+                .setEnabledIntents(IntentSet.of(Intent.GUILD_MEMBERS))
+                .withGateway(gateway -> {
+                    this.gateway = gateway;
+                    this.reloadLogChannel();
 
-            long appId = gateway.getRestClient().getApplicationId().blockOptional().orElseThrow();
-            ApplicationService appService = gateway.getRestClient().getApplicationService();
+                    long appId = gateway.getRestClient().getApplicationId().blockOptional().orElseThrow();
+                    ApplicationService appService = gateway.getRestClient().getApplicationService();
 
-            // delete existing (potentially unused) commands
-            appService
-                    .getGlobalApplicationCommands(appId)
-                    .map(ApplicationCommandData::id)
-                    .flatMap(cmdId -> appService.deleteGlobalApplicationCommand(appId, cmdId.asLong()))
-                    .collectList()
-                    .block();
+                    // delete existing (potentially unused) commands
+                    appService
+                            .getGlobalApplicationCommands(appId)
+                            .map(ApplicationCommandData::id)
+                            .flatMap(cmdId -> appService.deleteGlobalApplicationCommand(appId, cmdId.asLong()))
+                            .collectList()
+                            .block();
 
-            Map<String, BotCommand> commandMap = new HashMap<>(commands.size());
-            for (BotCommand command : commands) {
-                ApplicationCommandRequest req = command.provideCommandData();
-                commandMap.put(req.name(), command);
+                    Map<String, BotCommand> commandMap = new HashMap<>(commands.size());
+                    for (BotCommand command : commands) {
+                        ApplicationCommandRequest req = command.provideCommandData();
+                        commandMap.put(req.name(), command);
 
-                appService.createGlobalApplicationCommand(appId, req).block();
-            }
-
-            return gateway.on(GuildCreateEvent.class, event -> {
-                if (event.getGuild().getId().asLong() != this.getConfig().getMainGuildId()) {
-                    return Mono.empty();
-                }
-
-                this.reloadLogChannel(event.getGuild());
-                return Mono.empty();
-            }).then().and(gateway.on(ChatInputInteractionEvent.class, event -> {
-                User user = event.getInteraction().getUser();
-                CompletableFuture<Message> logMessage = new CompletableFuture<>();
-
-                if (this.logChannel != null) {
-                    Optional<Snowflake> guildId = event.getInteraction().getGuildId();
-                    String location = guildId.map(snowflake -> "" +
-                                    "Guild: `" + snowflake.asString() + "`\n" +
-                                    "Channel: `" + event.getInteraction().getChannelId().asString() + "`")
-                            .orElseGet(() -> "Private Messages: `" + event.getInteraction().getChannelId().asString() + "`")
-                            + "\n";
-
-                    String desc = "**" + MarkdownEscape.escape(user.getTag()) + "** (`" + user.getId().asString() + ")`\n" +
-                            location + "> " + CommandStringifier.stringify(event);
-
-                    this.logChannel.createMessage().withEmbeds(EmbedCreateSpec.builder()
-                                    .description(desc).color(Color.of(0xA9F90F))
-                                    .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
-                                    .build())
-                            .subscribe(logMessage::complete);
-                }
-
-                BotCommand command = commandMap.get(event.getCommandName());
-                if (command == null) {
-                    return event.reply(this.i18n.translate("command.not-found", event)).withEphemeral(true);
-                }
-
-                try {
-                    Translator translator = (key, args) -> this.i18n.translate(key, event, args);
-                    return command.run(this, event.getCommandName(), event, user, translator);
-                } catch (Throwable throwable) {
-                    throwable.printStackTrace();
-                    if (this.logChannel != null) {
-                        logMessage.thenAccept(msg -> {
-                            StringWriter strWriter = new StringWriter();
-                            try (PrintWriter writer = new PrintWriter(strWriter)) {
-                                throwable.printStackTrace(writer);
-                            }
-
-                            String stacktrace = strWriter.toString();
-                            int maxSize = 4096 - 3 * 2 /*code block markers*/;
-
-                            if (stacktrace.length() > maxSize) {
-                                stacktrace = stacktrace.substring(0, maxSize - 3 /*three dots*/) + "...";
-                            }
-
-                            this.logChannel.createMessage()
-                                    .withEmbeds(EmbedCreateSpec.builder()
-                                            .description("```" + stacktrace + "```")
-                                            .color(Color.of(0xCE3C1E))
-                                            .timestamp(Instant.now())
-                                            .footer(user.getTag(), user.getAvatarUrl())
-                                            .build())
-                                    .withMessageReference(msg.getId())
-                                    .subscribe();
-                        });
+                        appService.createGlobalApplicationCommand(appId, req).block();
+                        this.plugin.getLogger().info("Registered command '" + req.name() + "'");
                     }
 
-                    // We sadly don't know if a reply has already been defered, so have to ignore errors :(
-                    event.deferReply().withEphemeral(true)
-                            .onErrorResume(e -> Mono.empty()).subscribe();
+                    return gateway.on(GuildCreateEvent.class, event -> {
+                        if (event.getGuild().getId().asLong() == this.getConfig().getMainGuildId()) {
+                            this.mainGuild = event.getGuild();
+                            this.reloadLogChannel();
+                        }
+                        return Mono.empty();
+                    }).then().and(gateway.on(ChatInputInteractionEvent.class, event -> {
+                        User user = event.getInteraction().getUser();
+                        CompletableFuture<Message> logMessage = new CompletableFuture<>();
 
-                    return event.createFollowup(this.i18n.translate("command.errored", event,
-                            "`" + MarkdownEscape.codeEscape(throwable.toString()) + "`")).then();
-                }
-            }).then());
-        });
+                        if (this.logChannel != null) {
+                            Optional<Snowflake> guildId = event.getInteraction().getGuildId();
+                            String location = guildId.map(snowflake -> "Guild: `" + snowflake.asString() + "`\n" +
+                                            "Channel: `" + event.getInteraction().getChannelId().asString() + "`")
+                                    .orElseGet(() -> "Private Messages: `" + event.getInteraction().getChannelId().asString() + "`")
+                                    + "\n";
+
+                            String desc = "**" + MarkdownEscape.escape(user.getTag()) + "** (`" + user.getId().asString() + ")`\n" +
+                                    location + "> " + CommandStringifier.stringify(event);
+
+                            this.logChannel.createMessage().withEmbeds(EmbedCreateSpec.builder()
+                                            .description(desc).color(Color.of(0xA9F90F))
+                                            .timestamp(Instant.now()).footer(user.getTag(), user.getAvatarUrl())
+                                            .build())
+                                    .subscribe(logMessage::complete);
+                        }
+
+                        BotCommand command = commandMap.get(event.getCommandName());
+                        if (command == null) {
+                            return event.reply(this.i18n.translate("command.not-found", event)).withEphemeral(true);
+                        }
+
+                        try {
+                            Translator translator = (key, args) -> this.i18n.translate(key, event, args);
+                            return command.run(this, event.getCommandName(), event, user, translator)
+                                    .onErrorResume(throwable -> this.handleException(throwable, event, logMessage));
+                        } catch (Throwable throwable) {
+                            return this.handleException(throwable, event, logMessage);
+                        }
+                    }).then());
+                });
 
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> login.block());
+    }
+
+    private Mono<Void> handleException(Throwable throwable,
+                                       ChatInputInteractionEvent event,
+                                       CompletableFuture<Message> logMessage) {
+        throwable.printStackTrace();
+        if (this.logChannel == null) {
+            return Mono.empty();
+        }
+
+        logMessage.thenAccept(msg -> {
+            StringWriter strWriter = new StringWriter();
+            try (PrintWriter writer = new PrintWriter(strWriter)) {
+                throwable.printStackTrace(writer);
+            }
+
+            String stacktrace = strWriter.toString();
+            int maxSize = 4096 - 3 * 2 /*code block markers*/;
+
+            if (stacktrace.length() > maxSize) {
+                stacktrace = stacktrace.substring(0, maxSize - 3 /*three dots*/) + "...";
+            }
+
+            User user = event.getInteraction().getUser();
+            this.logChannel.createMessage()
+                    .withEmbeds(EmbedCreateSpec.builder()
+                            .description("```" + stacktrace + "```")
+                            .color(Color.of(0xCE3C1E))
+                            .timestamp(Instant.now())
+                            .footer(user.getTag(), user.getAvatarUrl())
+                            .build())
+                    .withMessageReference(msg.getId())
+                    .subscribe();
+        });
+
+        // We sadly don't know if a reply has already been defered, so have to ignore errors :(
+        event.deferReply().withEphemeral(true)
+                .onErrorResume(e -> Mono.empty()).subscribe();
+
+        return event.createFollowup(this.i18n.translate("command.errored", event,
+                "`" + MarkdownEscape.codeEscape(throwable.toString()) + "`")).then();
     }
 
     public void shutdownBot() {
@@ -275,8 +296,12 @@ public class CloudBotManager {
         return Objects.requireNonNull(this.storage, "Storage has not been loaded yet");
     }
 
-    public TextChannel getLogChannel() {
+    public @Nullable TextChannel getLogChannel() {
         return this.logChannel;
+    }
+
+    public @Nullable Guild getMainGuild() {
+        return this.mainGuild;
     }
 
     public Plugin getPlugin() {

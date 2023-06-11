@@ -16,7 +16,6 @@ import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.Permission;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -62,7 +61,7 @@ public class WhitelistCommand implements BotCommand {
     }
 
     @Override
-    public Publisher<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
         if (event.getOption("list").isPresent()) {
             return event.deferReply().withEphemeral(true).then(Mono.fromRunnable(() -> {
                 this.listLock.lock();

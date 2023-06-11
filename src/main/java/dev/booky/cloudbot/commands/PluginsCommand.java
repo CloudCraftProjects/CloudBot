@@ -9,7 +9,7 @@ import discord4j.core.object.entity.User;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
-import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 import java.util.Formatter;
 import java.util.HashSet;
@@ -35,7 +35,7 @@ public class PluginsCommand implements BotCommand {
     }
 
     @Override
-    public Publisher<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
         Set<Plugin> plugins = new HashSet<>(List.of(Bukkit.getPluginManager().getPlugins()));
         plugins.removeIf(Predicate.not(Plugin::isEnabled));
 

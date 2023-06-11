@@ -10,7 +10,7 @@ import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.rest.util.Color;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -29,7 +29,7 @@ public class ListCommand implements BotCommand {
     }
 
     @Override
-    public Publisher<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
+    public Mono<Void> run(CloudBotManager manager, String label, ChatInputInteractionEvent event, User user, Translator i18n) {
         Set<Player> players = new HashSet<>(Bukkit.getOnlinePlayers());
         players.removeIf(player -> player.hasMetadata("vanished"));
 
