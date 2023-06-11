@@ -1,10 +1,22 @@
 package dev.booky.cloudbot.storage;
 // Created by booky10 in CloudBot (16:08 10.10.22)
 
+import com.google.common.base.Preconditions;
+import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
+import discord4j.core.object.entity.User;
+import discord4j.core.spec.EmbedCreateSpec;
+import discord4j.discordjson.json.ApplicationCommandRequest;
+import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
+import discord4j.discordjson.possible.Possible;
+import discord4j.rest.util.Color;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.configurate.objectmapping.ConfigSerializable;
+import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 @SuppressWarnings("FieldMayBeFinal") // configurate
@@ -71,6 +83,101 @@ public class CloudBotConfig {
         }
     }
 
+    private Map<String, CustomCommand> customCommands = Map.of();
+
+    @ConfigSerializable
+    public static final class CustomCommand {
+
+        private String description = null;
+        private Map<String, String> l10nDescription = null;
+        private boolean allowInPrivateMessages = true;
+        private CommandResponse response = new CommandResponse();
+        private Map<String, CommandResponse> l10nResponse = null;
+
+        @ConfigSerializable
+        public static final class CommandResponse {
+
+            private boolean ephemeral = true;
+            private ResponseType responseType = ResponseType.EMPTY;
+            private String content = null;
+            private String title = null;
+            private Color color = null;
+
+            private CommandResponse() {
+            }
+
+            public enum ResponseType {
+
+                EMPTY {
+                    @Override
+                    protected Mono<Void> reply(ChatInputInteractionEvent event, CommandResponse data) {
+                        return event.reply("\u200B")
+                                .withEphemeral(data.ephemeral);
+                    }
+                },
+                MESSAGE {
+                    @Override
+                    protected Mono<Void> reply(ChatInputInteractionEvent event, CommandResponse data) {
+                        Preconditions.checkState(data.content != null, "No content specified in response data");
+                        return event.reply(data.content)
+                                .withEphemeral(data.ephemeral);
+                    }
+                },
+                EMBED {
+                    @Override
+                    protected Mono<Void> reply(ChatInputInteractionEvent event, CommandResponse data) {
+                        Preconditions.checkState(data.content != null || data.title != null,
+                                "No content and no title specified in response data");
+                        User user = event.getInteraction().getUser();
+                        return event.reply()
+                                .withEphemeral(data.ephemeral)
+                                .withEmbeds(EmbedCreateSpec.builder()
+                                        .description(ofNullable(data.content))
+                                        .title(ofNullable(data.title))
+                                        .color(ofNullable(data.color))
+                                        .footer(user.getTag(), user.getAvatarUrl())
+                                        .timestamp(Instant.now())
+                                        .build());
+                    }
+                };
+
+                protected abstract Mono<Void> reply(ChatInputInteractionEvent event, CommandResponse data);
+            }
+        }
+
+        private CustomCommand() {
+        }
+
+        private static <T> Possible<T> ofNullable(T val) {
+            if (val != null) {
+                return Possible.of(val);
+            }
+            return Possible.absent();
+        }
+
+        public ApplicationCommandRequest buildRequest(String label) {
+            ImmutableApplicationCommandRequest.Builder builder = ApplicationCommandRequest.builder().name(label)
+                    .description(ofNullable(this.description))
+                    .dmPermission(this.allowInPrivateMessages);
+            if (this.l10nDescription != null) {
+                builder.descriptionLocalizationsOrNull(this.l10nDescription);
+            }
+            return builder.build();
+        }
+
+        public Mono<Void> run(ChatInputInteractionEvent event) {
+            CommandResponse response = this.response;
+            if (this.l10nResponse != null && !this.l10nResponse.isEmpty()) {
+                Locale locale = new Locale(event.getInteraction().getUserLocale());
+                CommandResponse l10nResponse = this.l10nResponse.get(locale.getLanguage());
+                if (l10nResponse != null) {
+                    response = l10nResponse;
+                }
+            }
+            return response.responseType.reply(event, response);
+        }
+    }
+
     @SuppressWarnings("unused") // configurate
     private CloudBotConfig() {
     }
@@ -109,5 +216,9 @@ public class CloudBotConfig {
 
     public RandomMessages getLeaveMessages() {
         return this.leaveMessages;
+    }
+
+    public Map<String, CustomCommand> getCustomCommands() {
+        return this.customCommands;
     }
 }

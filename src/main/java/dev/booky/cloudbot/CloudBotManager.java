@@ -207,10 +207,24 @@ public class CloudBotManager {
                 });
     }
 
+    public Mono<Void> reloadCustomCommands() {
+        return this.getOrLoadMainGuild()
+                .flatMap(guild -> {
+                    long appId = guild.getClient().getRestClient().getApplicationId().blockOptional().orElseThrow();
+                    ApplicationService appService = guild.getClient().getRestClient().getApplicationService();
+
+                    return appService.bulkOverwriteGuildApplicationCommand(appId, guild.getId().asLong(),
+                                    this.getConfig().getCustomCommands().entrySet().stream()
+                                            .map(entry -> entry.getValue().buildRequest(entry.getKey())).toList())
+                            .collectList().then();
+                });
+    }
+
     public Mono<Void> reloadMainGuildData() {
         return this.reloadLogChannel().then()
                 .and(this.reloadMemberCounterChannel()).then()
-                .and(this.reloadInvites()).then();
+                .and(this.reloadInvites()).then()
+                .and(this.reloadCustomCommands()).then();
     }
 
     public void startBot() {
@@ -336,15 +350,25 @@ public class CloudBotManager {
                         .subscribe(logMessage::complete);
             }
 
-            AbstractBotCommand command = commandMap.get(event.getCommandName());
-            if (command == null) {
-                return event.reply(this.i18n.translate("command.not-found", event)).withEphemeral(true);
-            }
-
             try {
-                Translator translator = (key, args) -> this.i18n.translate(key, event, args);
-                return command.run(event, user, translator)
-                        .onErrorResume(throwable -> this.handleException(throwable, event, logMessage));
+                {
+                    AbstractBotCommand command = commandMap.get(event.getCommandName());
+                    if (command != null) {
+                        Translator translator = (key, args) -> this.i18n.translate(key, event, args);
+                        return command.run(event, user, translator)
+                                .onErrorResume(throwable -> this.handleException(throwable, event, logMessage));
+                    }
+                }
+
+                {
+                    CloudBotConfig.CustomCommand command = this.getConfig().getCustomCommands().get(event.getCommandName());
+                    if (command != null) {
+                        return command.run(event)
+                                .onErrorResume(throwable -> this.handleException(throwable, event, logMessage));
+                    }
+                }
+
+                return event.reply(this.i18n.translate("command.not-found", event)).withEphemeral(true);
             } catch (Throwable throwable) {
                 return this.handleException(throwable, event, logMessage);
             }

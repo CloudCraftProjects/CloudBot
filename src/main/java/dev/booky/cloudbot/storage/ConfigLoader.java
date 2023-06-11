@@ -1,19 +1,25 @@
 package dev.booky.cloudbot.storage;
 // Created by booky10 in ********** (12:55 27.06.22)
 
+import discord4j.rest.util.Color;
+import net.kyori.adventure.text.format.TextColor;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.gson.GsonConfigurationLoader;
 import org.spongepowered.configurate.loader.ConfigurationLoader;
+import org.spongepowered.configurate.serialize.ScalarSerializer;
+import org.spongepowered.configurate.serialize.SerializationException;
 import org.spongepowered.configurate.yaml.NodeStyle;
 import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 public class ConfigLoader {
 
@@ -21,8 +27,11 @@ public class ConfigLoader {
     private static final Map<Path, YamlConfigurationLoader> YAML_LOADER_CACHE = new HashMap<>();
 
     public static YamlConfigurationLoader createYamlLoader(Path path) {
-        return YAML_LOADER_CACHE.computeIfAbsent(path, $ -> YamlConfigurationLoader.builder().path(path)
-                .nodeStyle(NodeStyle.BLOCK).indent(2).build());
+        return YAML_LOADER_CACHE.computeIfAbsent(path, $ -> YamlConfigurationLoader.builder()
+                .path(path).nodeStyle(NodeStyle.BLOCK).indent(2)
+                .defaultOptions(opts -> opts.serializers(serializers -> serializers
+                        .register(new ColorSerializer())))
+                .build());
     }
 
     public static GsonConfigurationLoader createGsonLoader(Path path) {
@@ -82,6 +91,27 @@ public class ConfigLoader {
 
         public ConfigurationLoader<? extends ConfigurationNode> create(Path path) {
             return this.creator.apply(path);
+        }
+    }
+
+    private static final class ColorSerializer extends ScalarSerializer<Color> {
+
+        private ColorSerializer() {
+            super(Color.class);
+        }
+
+        @Override
+        public Color deserialize(Type type, Object obj) throws SerializationException {
+            TextColor color = TextColor.fromCSSHexString(String.valueOf(obj));
+            if (color != null) {
+                return Color.of(color.value());
+            }
+            throw new SerializationException("Can't deserialize color string: '" + obj + "'");
+        }
+
+        @Override
+        protected Object serialize(Color item, Predicate<Class<?>> typeSupported) {
+            return TextColor.color(item.getRGB()).asHexString();
         }
     }
 }
