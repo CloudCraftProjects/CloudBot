@@ -23,10 +23,14 @@ import discord4j.common.util.Snowflake;
 import discord4j.core.DiscordClient;
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
+import discord4j.core.event.domain.InviteCreateEvent;
+import discord4j.core.event.domain.InviteDeleteEvent;
 import discord4j.core.event.domain.guild.GuildCreateEvent;
+import discord4j.core.event.domain.guild.GuildDeleteEvent;
 import discord4j.core.event.domain.guild.MemberJoinEvent;
 import discord4j.core.event.domain.guild.MemberLeaveEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
+import discord4j.core.object.ExtendedInvite;
 import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.Message;
@@ -55,8 +59,10 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -85,6 +91,8 @@ public class CloudBotManager {
 
     private final TranslationManager i18n;
     private final Plugin plugin;
+
+    private final List<ExtendedInvite> currentInvites = new ArrayList<>();
 
     private GatewayDiscordClient gateway;
     private Guild mainGuild;
@@ -127,8 +135,7 @@ public class CloudBotManager {
 
         if (this.gateway != null) {
             this.reloadMainGuild().then()
-                    .and(this.reloadLogChannel()).then()
-                    .and(this.reloadMemberCounterChannel())
+                    .and(this.reloadMainGuildData()).then()
                     .subscribe();
         }
     }
@@ -156,6 +163,19 @@ public class CloudBotManager {
             }
             return Mono.just(this.mainGuild);
         });
+    }
+
+    public Mono<List<ExtendedInvite>> reloadInvites() {
+        return this.getOrLoadMainGuild()
+                .flatMap(guild -> guild.getInvites().collectList())
+                .doOnSuccess(invites -> {
+                    synchronized (this.currentInvites) {
+                        this.currentInvites.clear();
+                        if (invites != null) {
+                            this.currentInvites.addAll(invites);
+                        }
+                    }
+                });
     }
 
     public Mono<TextChannel> reloadLogChannel() {
@@ -187,6 +207,12 @@ public class CloudBotManager {
                 });
     }
 
+    public Mono<Void> reloadMainGuildData() {
+        return this.reloadLogChannel().then()
+                .and(this.reloadMemberCounterChannel()).then()
+                .and(this.reloadInvites()).then();
+    }
+
     public void startBot() {
         DiscordClient client = DiscordClientBuilder.create(this.getConfig().getToken())
                 .setDefaultAllowedMentions(AllowedMentions.suppressAll())
@@ -205,14 +231,14 @@ public class CloudBotManager {
         if (Bukkit.getPluginManager().getPlugin("spark") != null) {
             commands.add(new TpsCommand(this));
         }
+        commands.clear();
 
         Mono<Void> login = client.gateway()
                 .setEnabledIntents(IntentSet.of(Intent.GUILD_MEMBERS))
                 .withGateway(gateway -> {
                     this.gateway = gateway;
 
-                    return this.reloadLogChannel().then()
-                            .and(this.reloadMemberCounterChannel()).then()
+                    return this.reloadMainGuildData().then()
                             .and(Mono.defer(() -> {
                                 long appId = gateway.getRestClient().getApplicationId().blockOptional().orElseThrow();
                                 ApplicationService appService = gateway.getRestClient().getApplicationService();
@@ -238,13 +264,48 @@ public class CloudBotManager {
         return gateway.on(GuildCreateEvent.class, event -> {
             if (event.getGuild().getId().asLong() == this.getConfig().getMainGuildId()) {
                 this.mainGuild = event.getGuild();
-                return this.reloadLogChannel().then()
-                        .and(this.reloadMemberCounterChannel()).then();
+                return this.reloadMainGuildData();
             }
             return Mono.empty();
-        }).then().and(gateway.on(MemberJoinEvent.class, event -> {
+        }).then().and(gateway.on(GuildDeleteEvent.class, event -> {
             if (event.getGuildId().asLong() == this.getConfig().getMainGuildId()) {
-                return this.updateMemberCounter(this.memberCounterChannel);
+                synchronized (this.currentInvites) {
+                    this.currentInvites.clear();
+                }
+
+                this.mainGuild = null;
+                return this.reloadMainGuildData();
+            }
+            return Mono.empty();
+        })).then().and(gateway.on(InviteCreateEvent.class, event -> {
+            if (!event.getGuildId().map(id -> id.asLong() == this.getConfig().getMainGuildId()).orElse(false)) {
+                return Mono.empty();
+            }
+
+            // this works, don't judge it
+            return event.getClient().getRestClient().getInviteService()
+                    .getInvite(event.getCode())
+                    .map(data -> new ExtendedInvite(event.getClient(), data))
+                    .doOnSuccess(invite -> {
+                        if (invite == null) {
+                            return;
+                        }
+                        synchronized (this.currentInvites) {
+                            this.currentInvites.add(invite);
+                        }
+                    });
+        })).then().and(gateway.on(InviteDeleteEvent.class, event -> {
+            if (!event.getGuildId().map(id -> id.asLong() == this.getConfig().getMainGuildId()).orElse(false)) {
+                return Mono.empty();
+            }
+            synchronized (this.currentInvites) {
+                this.currentInvites.removeIf(invite -> invite.getCode().equals(event.getCode()));
+            }
+            return Mono.empty();
+        })).then().and(gateway.on(MemberJoinEvent.class, event -> {
+            if (event.getGuildId().asLong() == this.getConfig().getMainGuildId()) {
+                return this.checkInvites(event.getMember()).then()
+                        .and(this.updateMemberCounter(this.memberCounterChannel));
             }
             return Mono.empty();
         })).then().and(gateway.on(MemberLeaveEvent.class, event -> {
@@ -327,6 +388,71 @@ public class CloudBotManager {
 
         return event.createFollowup(this.i18n.translate("command.errored", event,
                 "`" + MarkdownEscape.codeEscape(throwable.toString()) + "`")).then();
+    }
+
+    private Mono<Void> checkInvites(Member member) {
+        if (this.mainGuild == null) {
+            return Mono.empty();
+        }
+
+        List<ExtendedInvite> invites;
+        synchronized (this.currentInvites) {
+            invites = this.currentInvites.stream()
+                    // filter out expired invites, they don't count
+                    .filter(invite -> invite.getExpiration()
+                            .map(expiration -> expiration.isBefore(Instant.now()))
+                            .orElse(true))
+                    .toList();
+        }
+
+        return this.reloadInvites()
+                .flatMap(newInvites -> {
+                    Map<String, ExtendedInvite> newCodes = newInvites.stream()
+                            .collect(Collectors.toUnmodifiableMap(ExtendedInvite::getCode, Function.identity()));
+
+                    // look for invites which had one use remaining and are now gone
+                    Optional<ExtendedInvite> usedInvite = invites.stream()
+                            .filter(invite -> invite.getMaxUses() > 0)
+                            .filter(invite -> invite.getMaxUses() - invite.getUses() == 1)
+                            .filter(invite -> !newCodes.containsKey(invite.getCode()))
+                            .findAny();
+
+                    if (usedInvite.isEmpty()) {
+                        // fallback to searching where an invitation's use count was incremented by 1
+                        usedInvite = invites.stream()
+                                .filter(invite -> newCodes.containsKey(invite.getCode()))
+                                .filter(invite -> invite.getUses() + 1 == newCodes.get(invite.getCode()).getUses())
+                                .findAny();
+                    }
+
+                    return Mono.justOrEmpty(usedInvite);
+                })
+                .flatMap(invite -> {
+                    String inviteUrl = "https://discord.gg/%s".formatted(invite.getCode());
+                    this.plugin.getSLF4JLogger().info("{} was invited by {}", member.getTag(), inviteUrl);
+
+                    if (this.logChannel == null) {
+                        return Mono.empty();
+                    }
+
+                    String desc = "**%s** (`%s`)\n".formatted(member.getTag(), member.getId()) +
+                            "Invite: " + inviteUrl + invite.getInviter()
+                            .map(inviter -> "\n  Created by **%s** (`%s`)"
+                                    .formatted(inviter.getTag(), inviter.getId()))
+                            .orElse("");
+
+                    EmbedCreateSpec.Builder embed = EmbedCreateSpec.builder()
+                            .description(desc)
+                            .color(Color.BLUE);
+
+                    invite.getExpiration().ifPresent(expiresAt ->
+                            embed.footer("Expires", null)
+                                    .timestamp(expiresAt));
+
+                    return this.logChannel.createMessage()
+                            .withEmbeds(embed.build());
+                })
+                .then();
     }
 
     private Mono<Void> updateMemberCounter(GuildChannel channel) {
