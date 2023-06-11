@@ -6,6 +6,7 @@ import dev.booky.cloudbot.commands.ExecuteCommand;
 import dev.booky.cloudbot.commands.ListCommand;
 import dev.booky.cloudbot.commands.PingCommand;
 import dev.booky.cloudbot.commands.PluginsCommand;
+import dev.booky.cloudbot.commands.TeamMembersCommand;
 import dev.booky.cloudbot.commands.TpsCommand;
 import dev.booky.cloudbot.commands.UserInfoCommand;
 import dev.booky.cloudbot.commands.WhitelistCommand;
@@ -160,6 +161,7 @@ public class CloudBotManager {
         commands.add(new ListCommand());
         commands.add(new PingCommand());
         commands.add(new PluginsCommand());
+        commands.add(new TeamMembersCommand());
         commands.add(new UserInfoCommand());
         commands.add(new WhitelistCommand());
         commands.add(new WhitelistRemoveCommand());

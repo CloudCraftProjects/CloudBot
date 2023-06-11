@@ -1,6 +1,7 @@
 package dev.booky.cloudbot.storage;
 // Created by booky10 in CloudBot (16:08 10.10.22)
 
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.configurate.objectmapping.ConfigSerializable;
 
 @SuppressWarnings("FieldMayBeFinal") // configurate
@@ -12,6 +13,7 @@ public class CloudBotConfig {
     private boolean whitelistActive = true;
     private long mainGuildId = -1L;
     private long logChannelId = -1L;
+    private long teamRoleId = -1L;
 
     @SuppressWarnings("unused") // configurate
     private CloudBotConfig() {
@@ -21,7 +23,7 @@ public class CloudBotConfig {
         return this.token;
     }
 
-    public String getInviteLink() {
+    public @Nullable String getInviteLink() {
         return "null".equals(this.inviteLink) ? null : this.inviteLink;
     }
 
@@ -35,5 +37,9 @@ public class CloudBotConfig {
 
     public long getLogChannelId() {
         return logChannelId;
+    }
+
+    public long getTeamRoleId() {
+        return this.teamRoleId;
     }
 }
