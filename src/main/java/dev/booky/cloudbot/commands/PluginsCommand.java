@@ -51,9 +51,9 @@ public class PluginsCommand implements BotCommand {
                 builder.append(", ");
             }
 
-            String name = MarkdownEscape.escape(plugin.getDescription().getName());
-            String version = MarkdownEscape.escape(plugin.getDescription().getVersion());
-            String website = MarkdownEscape.escape(plugin.getDescription().getWebsite());
+            String name = MarkdownEscape.escape(plugin.getPluginMeta().getName());
+            String version = MarkdownEscape.escape(plugin.getPluginMeta().getVersion());
+            String website = MarkdownEscape.escape(plugin.getPluginMeta().getWebsite());
 
             String format = website != null ? PLUGIN_WITH_SITE_FORMAT : PLUGIN_NO_SITE_FORMAT;
             formatter.format(format, name, version, website);
