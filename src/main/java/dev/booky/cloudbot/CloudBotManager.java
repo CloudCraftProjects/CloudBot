@@ -29,7 +29,6 @@ import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.User;
 import discord4j.core.object.entity.channel.TextChannel;
 import discord4j.core.spec.EmbedCreateSpec;
-import discord4j.discordjson.json.ApplicationCommandData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.gateway.intent.Intent;
 import discord4j.gateway.intent.IntentSet;
@@ -178,14 +177,16 @@ public class CloudBotManager {
                     long appId = gateway.getRestClient().getApplicationId().blockOptional().orElseThrow();
                     ApplicationService appService = gateway.getRestClient().getApplicationService();
 
+                    this.plugin.getLogger().info("Unregistering existing commands...");
                     // delete existing (potentially unused) commands
-                    appService
-                            .getGlobalApplicationCommands(appId)
-                            .map(ApplicationCommandData::id)
-                            .flatMap(cmdId -> appService.deleteGlobalApplicationCommand(appId, cmdId.asLong()))
-                            .collectList()
-                            .block();
+                    appService.getGlobalApplicationCommands(appId)
+                            .collectList().blockOptional().orElseThrow()
+                            .forEach(cmd -> {
+                                appService.deleteGlobalApplicationCommand(appId, cmd.id().asLong()).block();
+                                this.plugin.getLogger().info("Unregistered command '" + cmd.name() + "'");
+                            });
 
+                    this.plugin.getLogger().info("Registering " + commands.size() + " new commands...");
                     Map<String, BotCommand> commandMap = new HashMap<>(commands.size());
                     for (BotCommand command : commands) {
                         ApplicationCommandRequest req = command.provideCommandData();
@@ -195,6 +196,7 @@ public class CloudBotManager {
                         this.plugin.getLogger().info("Registered command '" + req.name() + "'");
                     }
 
+                    this.plugin.getLogger().info("Finished startup, starting to listen for events...");
                     return gateway.on(GuildCreateEvent.class, event -> {
                         if (event.getGuild().getId().asLong() == this.getConfig().getMainGuildId()) {
                             this.mainGuild = event.getGuild();
