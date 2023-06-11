@@ -178,6 +178,31 @@ public class CloudBotConfig {
         }
     }
 
+    private Map<Long, ReactionRole> reactionRoles = Map.of();
+
+    @ConfigSerializable
+    public static final class ReactionRole {
+
+        private long channelId = -1L;
+        private String emoji = "\u2705";
+        private long roleId = -1L;
+
+        private ReactionRole() {
+        }
+
+        public long getChannelId() {
+            return this.channelId;
+        }
+
+        public String getEmoji() {
+            return this.emoji;
+        }
+
+        public long getRoleId() {
+            return this.roleId;
+        }
+    }
+
     @SuppressWarnings("unused") // configurate
     private CloudBotConfig() {
     }
@@ -220,5 +245,9 @@ public class CloudBotConfig {
 
     public Map<String, CustomCommand> getCustomCommands() {
         return this.customCommands;
+    }
+
+    public Map<Long, ReactionRole> getReactionRoles() {
+        return this.reactionRoles;
     }
 }

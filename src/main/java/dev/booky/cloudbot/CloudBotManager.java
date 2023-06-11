@@ -30,6 +30,9 @@ import discord4j.core.event.domain.guild.GuildDeleteEvent;
 import discord4j.core.event.domain.guild.MemberJoinEvent;
 import discord4j.core.event.domain.guild.MemberLeaveEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
+import discord4j.core.event.domain.message.ReactionAddEvent;
+import discord4j.core.event.domain.message.ReactionRemoveAllEvent;
+import discord4j.core.event.domain.message.ReactionRemoveEvent;
 import discord4j.core.object.ExtendedInvite;
 import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.Member;
@@ -39,6 +42,8 @@ import discord4j.core.object.entity.channel.Channel;
 import discord4j.core.object.entity.channel.GuildChannel;
 import discord4j.core.object.entity.channel.TextChannel;
 import discord4j.core.object.entity.channel.VoiceChannel;
+import discord4j.core.object.reaction.Reaction;
+import discord4j.core.object.reaction.ReactionEmoji;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.core.spec.TextChannelEditMono;
 import discord4j.core.spec.VoiceChannelEditMono;
@@ -220,11 +225,31 @@ public class CloudBotManager {
                 });
     }
 
+    public Mono<Void> reloadReactionRoles() {
+        return this.getOrLoadMainGuild()
+                .flatMap(guild -> {
+                    Mono<Void> mono = Mono.empty();
+                    for (Map.Entry<Long, CloudBotConfig.ReactionRole> entry : this.getConfig().getReactionRoles().entrySet()) {
+                        ReactionEmoji.Unicode emoji = ReactionEmoji.unicode(entry.getValue().getEmoji());
+                        mono = mono.and(guild.getChannelById(Snowflake.of(entry.getValue().getChannelId()))
+                                .filter(channel -> channel instanceof TextChannel)
+                                .map(channel -> (TextChannel) channel)
+                                .flatMap(channel -> channel.getMessageById(Snowflake.of(entry.getKey())))
+                                .filter(message -> message.getReactions().stream()
+                                        .map(Reaction::getEmoji).noneMatch(Predicate.isEqual(emoji)))
+                                .flatMap(message -> message.addReaction(emoji))).then();
+                    }
+                    return mono;
+                })
+                .then();
+    }
+
     public Mono<Void> reloadMainGuildData() {
         return this.reloadLogChannel().then()
                 .and(this.reloadMemberCounterChannel()).then()
                 .and(this.reloadInvites()).then()
-                .and(this.reloadCustomCommands()).then();
+                .and(this.reloadCustomCommands()).then()
+                .and(this.reloadReactionRoles()).then();
     }
 
     public void startBot() {
@@ -245,10 +270,9 @@ public class CloudBotManager {
         if (Bukkit.getPluginManager().getPlugin("spark") != null) {
             commands.add(new TpsCommand(this));
         }
-        commands.clear();
 
         Mono<Void> login = client.gateway()
-                .setEnabledIntents(IntentSet.of(Intent.GUILD_MEMBERS))
+                .setEnabledIntents(IntentSet.of(Intent.GUILD_MEMBERS, Intent.GUILD_INVITES, Intent.GUILD_MESSAGE_REACTIONS))
                 .withGateway(gateway -> {
                     this.gateway = gateway;
 
@@ -327,6 +351,37 @@ public class CloudBotManager {
             if (event.getGuildId().asLong() == this.getConfig().getMainGuildId()) {
                 return this.sendRandomMessage(event.getMember().orElse(null), this.getConfig().getLeaveMessages()).then()
                         .and(this.updateMemberCounter(this.memberCounterChannel)).then();
+            }
+            return Mono.empty();
+        })).then().and(gateway.on(ReactionAddEvent.class, event -> {
+            CloudBotConfig.ReactionRole role = this.getConfig().getReactionRoles().get(event.getMessageId().asLong());
+            if (role != null) {
+                return event.getMember()
+                        .map(member -> member.addRole(Snowflake.of(role.getRoleId())))
+                        .orElseGet(Mono::empty);
+            }
+            return Mono.empty();
+        })).then().and(gateway.on(ReactionRemoveEvent.class, event -> {
+            CloudBotConfig.ReactionRole role = this.getConfig().getReactionRoles().get(event.getMessageId().asLong());
+            if (role == null) {
+                return Mono.empty();
+            }
+
+            if (event.getUserId().equals(event.getClient().getSelfId())) {
+                // an admin removed our reaction, add it back!
+                return this.reloadReactionRoles();
+            }
+
+            return event.getGuildId()
+                    .map(guildId -> event.getClient().getGuildById(guildId)
+                            .flatMap(guild -> guild.getMemberById(event.getUserId()))
+                            .flatMap(member -> member.removeRole(Snowflake.of(role.getRoleId()))))
+                    .orElseGet(Mono::empty);
+        })).then().and(gateway.on(ReactionRemoveAllEvent.class, event -> {
+            CloudBotConfig.ReactionRole role = this.getConfig().getReactionRoles().get(event.getMessageId().asLong());
+            if (role != null) {
+                // updates and re-reacts to the message
+                return this.reloadReactionRoles();
             }
             return Mono.empty();
         })).then().and(gateway.on(ChatInputInteractionEvent.class, event -> {
