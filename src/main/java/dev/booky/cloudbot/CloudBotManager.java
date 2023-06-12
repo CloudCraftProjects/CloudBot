@@ -4,6 +4,7 @@ package dev.booky.cloudbot;
 import dev.booky.cloudbot.commands.AbstractBotCommand;
 import dev.booky.cloudbot.commands.ExecuteCommand;
 import dev.booky.cloudbot.commands.ListCommand;
+import dev.booky.cloudbot.commands.MessageCommand;
 import dev.booky.cloudbot.commands.PingCommand;
 import dev.booky.cloudbot.commands.PluginsCommand;
 import dev.booky.cloudbot.commands.TeamMembersCommand;
@@ -23,6 +24,7 @@ import discord4j.common.util.Snowflake;
 import discord4j.core.DiscordClient;
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
+import discord4j.core.event.domain.Event;
 import discord4j.core.event.domain.InviteCreateEvent;
 import discord4j.core.event.domain.InviteDeleteEvent;
 import discord4j.core.event.domain.guild.GuildCreateEvent;
@@ -34,6 +36,7 @@ import discord4j.core.event.domain.message.ReactionAddEvent;
 import discord4j.core.event.domain.message.ReactionRemoveAllEvent;
 import discord4j.core.event.domain.message.ReactionRemoveEvent;
 import discord4j.core.object.ExtendedInvite;
+import discord4j.core.object.command.Interaction;
 import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.Member;
 import discord4j.core.object.entity.Message;
@@ -266,6 +269,7 @@ public class CloudBotManager {
         commands.add(new UserInfoCommand(this));
         commands.add(new WhitelistCommand(this));
         commands.add(new WhitelistRemoveCommand(this));
+        commands.add(new MessageCommand(this));
 
         if (Bukkit.getPluginManager().getPlugin("spark") != null) {
             commands.add(new TpsCommand(this));
@@ -299,13 +303,22 @@ public class CloudBotManager {
         Map<String, AbstractBotCommand> commandMap = commands.stream()
                 .collect(Collectors.toUnmodifiableMap(AbstractBotCommand::getLabel, Function.identity()));
 
-        return gateway.on(GuildCreateEvent.class, event -> {
+        return gateway.on(Event.class, event -> {
+            Mono<Void> mono = Mono.empty();
+            for (AbstractBotCommand command : commands) {
+                Mono<Void> handled = command.handleEvent(event);
+                if (handled != Mono.<Void>empty()) {
+                    mono = mono.and(handled).then();
+                }
+            }
+            return mono;
+        }).then().and(gateway.on(GuildCreateEvent.class, event -> {
             if (event.getGuild().getId().asLong() == this.getConfig().getMainGuildId()) {
                 this.mainGuild = event.getGuild();
                 return this.reloadMainGuildData();
             }
             return Mono.empty();
-        }).then().and(gateway.on(GuildDeleteEvent.class, event -> {
+        })).then().and(gateway.on(GuildDeleteEvent.class, event -> {
             if (event.getGuildId().asLong() == this.getConfig().getMainGuildId()) {
                 synchronized (this.currentInvites) {
                     this.currentInvites.clear();
@@ -409,8 +422,7 @@ public class CloudBotManager {
                 {
                     AbstractBotCommand command = commandMap.get(event.getCommandName());
                     if (command != null) {
-                        Translator translator = (key, args) -> this.i18n.translate(key, event, args);
-                        return command.run(event, user, translator)
+                        return command.run(event, user, this.createTranslator(event.getInteraction()))
                                 .onErrorResume(throwable -> this.handleException(throwable, event, logMessage));
                     }
                 }
@@ -585,6 +597,10 @@ public class CloudBotManager {
                     throw new AssertionError();
                 })
                 .then();
+    }
+
+    public Translator createTranslator(Interaction interaction) {
+        return (key, args) -> this.i18n.translate(key, interaction.getUserLocale(), args);
     }
 
     public void shutdownBot() {
