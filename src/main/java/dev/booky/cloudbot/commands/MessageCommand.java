@@ -23,15 +23,14 @@ import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.User;
 import discord4j.core.object.entity.channel.TextChannel;
 import discord4j.core.object.reaction.ReactionEmoji;
+import discord4j.core.spec.EmbedCreateFields;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.core.spec.InteractionPresentModalSpec;
 import discord4j.core.spec.MessageCreateMono;
 import discord4j.core.spec.MessageEditMono;
 import discord4j.discordjson.json.ApplicationCommandOptionChoiceData;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
-import discord4j.discordjson.json.EmbedData;
 import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
-import discord4j.discordjson.possible.Possible;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.Permission;
 import discord4j.rest.util.PermissionSet;
@@ -50,7 +49,11 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
     private static final Permission PERMISSION = Permission.ADMINISTRATOR;
 
     private static final String SELECTION_ID = "message-selection";
+    private static final String SELECT_MESSAGE = "message";
+    private static final String SELECT_EMBED = "embed";
+
     private static final String EDIT_ID = "edit";
+    private static final String IMPORT_ID = "import";
     private static final String SEND_ID = "send";
 
     private static final String EDIT_MESSAGE_ID = "edit-message";
@@ -85,11 +88,11 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                         .choices(ApplicationCommandOptionChoiceData.builder()
                                         .name("Message")
                                         .nameLocalizationsOrNull(Map.of("de", "Nachricht"))
-                                        .value("message").build(),
+                                        .value(SELECT_MESSAGE).build(),
                                 ApplicationCommandOptionChoiceData.builder()
                                         .name("Embed")
                                         .nameLocalizationsOrNull(Map.of("de", "Embed"))
-                                        .value("embed").build())
+                                        .value(SELECT_EMBED).build())
                         .required(false)
                         .build());
     }
@@ -104,10 +107,10 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
         }
 
         String type = optType.get();
-        if (type.equals("message")) {
+        if (type.equals(SELECT_MESSAGE)) {
             return this.runMessageMenu(event, i18n);
         }
-        if (type.equals("embed")) {
+        if (type.equals(SELECT_EMBED)) {
             return this.runEmbedMenu(event, i18n);
         }
         throw new IllegalStateException("Illegal type specified: " + type);
@@ -121,10 +124,10 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
 
         Translator translator = this.manager.createTranslator(event.getInteraction());
         return this.withPermission(event.getInteraction(), () -> {
-            if (event.getValues().contains("message")) {
+            if (event.getValues().contains(SELECT_MESSAGE)) {
                 return this.runMessageMenu(event, translator);
             }
-            if (event.getValues().contains("embed")) {
+            if (event.getValues().contains(SELECT_EMBED)) {
                 return this.runEmbedMenu(event, translator);
             }
             throw new IllegalStateException("Illegal type selection: " + event.getValues());
@@ -133,10 +136,10 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
 
     private Mono<Void> runSelection(ChatInputInteractionEvent event, Translator i18n) {
         SelectMenu selectMenu = SelectMenu.of(SELECTION_ID,
-                        SelectMenu.Option.of(i18n.apply("command.message.selection.message.name"), "message")
+                        SelectMenu.Option.of(i18n.apply("command.message.selection.message.name"), SELECT_MESSAGE)
                                 .withDescription(i18n.apply("command.message.selection.message.desc"))
                                 .withEmoji(ReactionEmoji.unicode("\uD83D\uDCE7")),
-                        SelectMenu.Option.of(i18n.apply("command.message.selection.embed.name"), "embed")
+                        SelectMenu.Option.of(i18n.apply("command.message.selection.embed.name"), SELECT_EMBED)
                                 .withDescription(i18n.apply("command.message.selection.embed.desc"))
                                 .withEmoji(ReactionEmoji.unicode("\uD83D\uDCDC")))
                 .withPlaceholder(i18n.apply("command.message.selection.hint"));
@@ -150,23 +153,30 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                 i18n.apply("command.message.edit"));
     }
 
+    private Button getImportButton(Translator i18n) {
+        return Button.primary(IMPORT_ID, ReactionEmoji.unicode("\u2B07\uFE0F"),
+                i18n.apply("command.message.import"));
+    }
+
     private Button getSendButton(Translator i18n) {
-        return Button.primary(SEND_ID, ReactionEmoji.unicode("\uD83D\uDCE8"),
+        return Button.success(SEND_ID, ReactionEmoji.unicode("\uD83D\uDCE8"),
                 i18n.apply("command.message.send"));
     }
 
     private Mono<Void> runMessageMenu(DeferrableInteractionEvent event, Translator i18n) {
         return event.reply(i18n.apply("command.message.no-content"))
-                .withComponents(ActionRow.of(this.getEditButton(i18n), this.getSendButton(i18n)));
+                .withComponents(ActionRow.of(this.getEditButton(i18n),
+                        this.getImportButton(i18n), this.getSendButton(i18n)));
     }
 
     private Mono<Void> runEmbedMenu(DeferrableInteractionEvent event, Translator i18n) {
         return event.reply()
-                .withComponents(ActionRow.of(this.getEditButton(i18n), this.getSendButton(i18n)))
                 .withEmbeds(EmbedCreateSpec.builder()
                         .description(i18n.apply("command.message.no-content"))
                         .color(Color.of(0x27292E))
-                        .build());
+                        .build())
+                .withComponents(ActionRow.of(this.getEditButton(i18n),
+                        this.getImportButton(i18n), this.getSendButton(i18n)));
     }
 
     public InteractionPresentModalSpec createMessageEditModal(Translator i18n, Message message) {
@@ -224,14 +234,26 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                 .build();
     }
 
+    public InteractionPresentModalSpec createImportModal(Translator i18n) {
+        return InteractionPresentModalSpec.builder()
+                .title(i18n.apply("command.message.import.modal-title"))
+                .customId(IMPORT_ID)
+                .addComponent(ActionRow.of(TextInput.small(CHANNEL_ID,
+                                i18n.apply("command.message.import.channel-id"))
+                        .required(false)))
+                .addComponent(ActionRow.of(TextInput.small(MESSAGE_ID,
+                                i18n.apply("command.message.import.message-id"))
+                        .required(true)))
+                .build();
+    }
+
     public InteractionPresentModalSpec createSendingModal(Translator i18n) {
         return InteractionPresentModalSpec.builder()
                 .title(i18n.apply("command.message.send.modal-title"))
                 .customId(SEND_ID)
-//                .addComponent(ActionRow.of(SelectMenu.ofChannel(CHANNEL_ID, Channel.Type.GUILD_TEXT))) // TODO: what the fuck?
                 .addComponent(ActionRow.of(TextInput.small(CHANNEL_ID,
                                 i18n.apply("command.message.send.channel-id"))
-                        .required(true)))
+                        .required(false)))
                 .addComponent(ActionRow.of(TextInput.small(MESSAGE_ID,
                                 i18n.apply("command.message.send.message-id"))
                         .required(false)))
@@ -260,6 +282,14 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
             });
         }
 
+        if (IMPORT_ID.equals(event.getCustomId())) {
+            return Mono.defer(() -> {
+                Translator i18n = this.manager.createTranslator(event.getInteraction());
+                return this.withPermission(event.getInteraction(),
+                        () -> event.presentModal(this.createImportModal(i18n)), PERMISSION);
+            });
+        }
+
         if (SEND_ID.equals(event.getCustomId())) {
             return Mono.defer(() -> {
                 Translator i18n = this.manager.createTranslator(event.getInteraction());
@@ -279,6 +309,32 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                 .map(child -> (TextInput) child)
                 .collect(Collectors.toUnmodifiableMap(
                         TextInput::getCustomId, TextInput::getValue));
+    }
+
+    public Map.Entry<Long, Optional<Long>> extractMessageRefInputs(ModalSubmitInteractionEvent event) {
+        Map<String, Optional<String>> inputs = this.extractInputs(event);
+        Optional<String> rawChannelId = inputs.getOrDefault(CHANNEL_ID, Optional.empty());
+        Optional<String> rawMessageId = inputs.getOrDefault(MESSAGE_ID, Optional.empty());
+
+        Optional<Long> optChannelId = Optional.empty();
+        Optional<Long> optMessageId = Optional.empty();
+        if (rawMessageId.isPresent()) {
+            String[] split = StringUtils.split(rawMessageId.get(), '-');
+            if (split.length == 1) {
+                optMessageId = this.parseId(split[0]);
+            } else if (split.length == 2) {
+                optChannelId = this.parseId(split[0]);
+                optMessageId = this.parseId(split[1]);
+            }
+        }
+
+        if (optChannelId.isEmpty()) {
+            optChannelId = rawChannelId.flatMap(this::parseId);
+        }
+
+        Message message = event.getMessage().orElseThrow();
+        long channelId = optChannelId.orElseGet(() -> message.getChannelId().asLong());
+        return Map.entry(channelId, optMessageId);
     }
 
     public Mono<Void> submitEditMessage(ModalSubmitInteractionEvent event) {
@@ -316,83 +372,109 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                 .then();
     }
 
-    public Mono<Void> submitSend(ModalSubmitInteractionEvent event) {
+    public Mono<Void> submitImport(ModalSubmitInteractionEvent event) {
         Message message = event.getMessage().orElseThrow();
-        return Mono.fromSupplier(() -> this.extractInputs(event)).flatMap(inputs -> {
-            long channelId = inputs.getOrDefault(CHANNEL_ID, Optional.empty())
-                    .map(str -> str.replaceAll("\\D+", ""))
-                    .filter(Predicate.not(StringUtils::isBlank))
-                    .map(Long::parseLong)
-                    .orElseGet(() -> message.getChannelId().asLong());
-            Optional<Long> messageId = inputs.getOrDefault(MESSAGE_ID, Optional.empty())
-                    .map(str -> str.replaceAll("\\D+", ""))
-                    .filter(Predicate.not(StringUtils::isBlank))
-                    .map(Long::parseLong);
-
-            return message.getGuild()
-                    .flatMap(guild -> guild.getChannelById(Snowflake.of(channelId)))
-                    .filter(channel -> channel instanceof TextChannel)
-                    .map(channel -> (TextChannel) channel)
-                    .flatMap(channel -> {
-                        if (messageId.isEmpty()) {
-                            MessageCreateMono creator = channel.createMessage();
-                            if (!StringUtils.isBlank(message.getContent())) {
-                                creator = creator.withContent(message.getContent());
-                            }
-                            return creator.withEmbeds(message.getEmbeds().stream()
-                                            .map(this::partialCopy).toList())
-                                    .then();
-                        }
-
-                        return channel.getMessageById(Snowflake.of(messageId.get()))
-                                .flatMap(targetMsg -> {
-                                    MessageEditMono editor = targetMsg.edit();
-                                    if (!StringUtils.isBlank(message.getContent())) {
-                                        editor = editor.withContentOrNull(message.getContent());
-                                    } else {
-                                        editor = editor.withContentOrNull(null);
-                                    }
-                                    return editor.withEmbedsOrNull(message.getEmbeds().stream()
-                                            .map(this::partialCopy).toList());
-                                })
-                                .then();
-                    });
-        }).then();
+        return Mono.fromSupplier(() -> this.extractMessageRefInputs(event))
+                .filter(inputs -> inputs.getValue().isPresent())
+                .flatMap(inputs -> {
+                    long messageId = inputs.getValue().orElseThrow(AssertionError::new);
+                    return message.getGuild()
+                            .flatMap(guild -> guild.getChannelById(Snowflake.of(inputs.getKey())))
+                            .filter(channel -> channel instanceof TextChannel)
+                            .map(channel -> (TextChannel) channel)
+                            .flatMap(channel -> channel.getMessageById(Snowflake.of(messageId)))
+                            .flatMap(targetMessage -> message.edit()
+                                    .withContentOrNull(targetMessage.getContent())
+                                    .withAttachmentsOrNull(targetMessage.getAttachments())
+                                    .withEmbedsOrNull(targetMessage.getEmbeds().stream()
+                                            .map(this::toCreateSpec).toList()));
+                })
+                .then();
     }
 
-    private EmbedCreateSpec partialCopy(Embed embed) {
-        EmbedData data = embed.getData();
-        Possible<Color> color = Possible.absent();
-        if (!data.color().isAbsent()) {
-            color = Possible.of(Color.of(data.color().get()));
+    private Optional<Long> parseId(String input) {
+        return Optional.of(input.replaceAll("\\D+", ""))
+                .filter(Predicate.not(StringUtils::isBlank))
+                .map(Long::parseLong);
+    }
+
+    public Mono<Void> submitSend(ModalSubmitInteractionEvent event) {
+        Message message = event.getMessage().orElseThrow();
+        return Mono.fromSupplier(() -> this.extractMessageRefInputs(event))
+                .flatMap(inputs -> message.getGuild()
+                        .flatMap(guild -> guild.getChannelById(Snowflake.of(inputs.getKey())))
+                        .filter(channel -> channel instanceof TextChannel)
+                        .map(channel -> (TextChannel) channel)
+                        .flatMap(channel -> {
+                            if (inputs.getValue().isEmpty()) {
+                                MessageCreateMono creator = channel.createMessage();
+                                if (!StringUtils.isBlank(message.getContent())) {
+                                    creator = creator.withContent(message.getContent());
+                                }
+                                return creator.withEmbeds(message.getEmbeds().stream()
+                                                .map(this::toCreateSpec).toList())
+                                        .then();
+                            }
+
+                            return channel.getMessageById(Snowflake.of(inputs.getValue().get()))
+                                    .flatMap(targetMsg -> {
+                                        MessageEditMono editor = targetMsg.edit();
+                                        if (!StringUtils.isBlank(message.getContent())) {
+                                            editor = editor.withContentOrNull(message.getContent());
+                                        } else {
+                                            editor = editor.withContentOrNull(null);
+                                        }
+                                        return editor.withEmbedsOrNull(message.getEmbeds().stream()
+                                                .map(this::toCreateSpec).toList());
+                                    });
+                        })).then();
+    }
+
+    private EmbedCreateSpec toCreateSpec(Embed embed) {
+        EmbedCreateSpec.Builder builder = EmbedCreateSpec.builder();
+
+        embed.getTitle().ifPresent(builder::title);
+        embed.getDescription().ifPresent(builder::description);
+        embed.getColor().ifPresent(builder::color);
+        embed.getTimestamp().ifPresent(builder::timestamp);
+        embed.getThumbnail().map(Embed.Thumbnail::getUrl).ifPresent(builder::thumbnail);
+        embed.getImage().map(Embed.Image::getUrl).ifPresent(builder::image);
+        embed.getUrl().ifPresent(builder::url);
+
+        embed.getAuthor().ifPresent(author -> builder.author(author.getName().orElseThrow(),
+                author.getUrl().orElse(null), author.getIconUrl().orElse(null)));
+        embed.getFooter().ifPresent(footer -> builder.footer(footer.getText(), footer.getIconUrl().orElse(null)));
+
+        for (Embed.Field field : embed.getFields()) {
+            builder.addFields(EmbedCreateFields.Field.of(field.getName(),
+                    field.getValue(), field.isInline()));
         }
 
-        return EmbedCreateSpec.builder()
-                .title(data.title())
-                .description(data.description())
-                .color(color)
-                .build();
+        return builder.build();
     }
 
     @DcEventHandler
     public Mono<Void> onModalSubmit(ModalSubmitInteractionEvent event) {
-        return Mono.defer(() -> {
-            if (EDIT_MESSAGE_ID.equals(event.getCustomId())) {
-                return this.withPermission(event.getInteraction(),
-                        () -> this.submitEditMessage(event), Permission.ADMINISTRATOR);
-            }
+        if (EDIT_MESSAGE_ID.equals(event.getCustomId())) {
+            return event.deferEdit().then().and(this.withPermission(event.getInteraction(),
+                    () -> this.submitEditMessage(event), Permission.ADMINISTRATOR));
+        }
 
-            if (EDIT_EMBED_ID.equals(event.getCustomId())) {
-                return this.withPermission(event.getInteraction(),
-                        () -> this.submitEditEmbed(event), Permission.ADMINISTRATOR);
-            }
+        if (EDIT_EMBED_ID.equals(event.getCustomId())) {
+            return event.deferEdit().then().and(this.withPermission(event.getInteraction(),
+                    () -> this.submitEditEmbed(event), Permission.ADMINISTRATOR));
+        }
 
-            if (SEND_ID.equals(event.getCustomId())) {
-                return this.withPermission(event.getInteraction(),
-                        () -> this.submitSend(event), Permission.ADMINISTRATOR);
-            }
+        if (IMPORT_ID.equals(event.getCustomId())) {
+            return event.deferEdit().then().and(this.withPermission(event.getInteraction(),
+                    () -> this.submitImport(event), Permission.ADMINISTRATOR));
+        }
 
-            return Mono.empty();
-        }).flatMap($ -> event.deferEdit());
+        if (SEND_ID.equals(event.getCustomId())) {
+            return event.deferEdit().then().and(this.withPermission(event.getInteraction(),
+                    () -> this.submitSend(event), Permission.ADMINISTRATOR));
+        }
+
+        return Mono.empty();
     }
 }
