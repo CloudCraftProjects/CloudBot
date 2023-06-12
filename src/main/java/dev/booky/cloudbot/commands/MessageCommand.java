@@ -385,7 +385,6 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                             .flatMap(channel -> channel.getMessageById(Snowflake.of(messageId)))
                             .flatMap(targetMessage -> message.edit()
                                     .withContentOrNull(targetMessage.getContent())
-                                    .withAttachmentsOrNull(targetMessage.getAttachments())
                                     .withEmbedsOrNull(targetMessage.getEmbeds().stream()
                                             .map(this::toCreateSpec).toList()));
                 })
