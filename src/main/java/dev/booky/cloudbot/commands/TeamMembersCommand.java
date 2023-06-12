@@ -38,7 +38,7 @@ public final class TeamMembersCommand extends AbstractBotCommand {
         Preconditions.checkState(teamRoleId != -1L, "No team role configured");
 
         Snowflake teamRoleSf = Snowflake.of(teamRoleId);
-        return event.deferReply().withEphemeral(true).then(guild.getMembers()
+        return event.deferReply().withEphemeral(true).then().and(guild.getMembers()
                 .filter(member -> member.getRoleIds().contains(teamRoleSf))
                 .flatMap(mem -> mem.getRoles()
                         .filter(Role::isHoisted)

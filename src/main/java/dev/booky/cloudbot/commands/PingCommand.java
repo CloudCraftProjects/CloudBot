@@ -34,8 +34,8 @@ public final class PingCommand extends AbstractBotCommand {
                 .withEmbeds(EmbedCreateSpec.builder()
                         .color(Color.CYAN)
                         .description(i18n.apply("command.ping.waiting", user.getMention()))
-                        .build())
-                .then(Mono.defer(() -> {
+                        .build()).then()
+                .and(Mono.defer(() -> {
                     long ping = System.currentTimeMillis() - start;
                     return event.editReply()
                             .withEmbeds(EmbedCreateSpec.builder()

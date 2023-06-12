@@ -24,15 +24,15 @@ public abstract class AbstractBotCommand {
 
     public abstract Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n);
 
-    public Mono<Void> handleEvent(Event rawEvent) {
-        return Mono.empty();
-    }
-
     public ApplicationCommandRequest buildRequest() {
         ImmutableApplicationCommandRequest.Builder builder =
                 ApplicationCommandRequest.builder().name(this.getLabel());
         this.buildRequest(builder);
         return builder.build();
+    }
+
+    public boolean shouldRegister() {
+        return true;
     }
 
     public String getLabel() {

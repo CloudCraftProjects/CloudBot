@@ -65,7 +65,7 @@ public final class WhitelistCommand extends AbstractBotCommand {
     @Override
     public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
         if (event.getOption("list").isPresent()) {
-            return event.deferReply().withEphemeral(true).then(Mono.defer(() -> {
+            return event.deferReply().withEphemeral(true).then().and(Mono.defer(() -> {
                 this.listLock.lock();
 
                 try {

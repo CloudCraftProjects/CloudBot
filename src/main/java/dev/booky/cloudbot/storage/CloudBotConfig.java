@@ -90,7 +90,6 @@ public class CloudBotConfig {
 
         private String description = null;
         private Map<String, String> l10nDescription = null;
-        private boolean allowInPrivateMessages = true;
         private CommandResponse response = new CommandResponse();
         private Map<String, CommandResponse> l10nResponse = null;
 
@@ -157,8 +156,7 @@ public class CloudBotConfig {
 
         public ApplicationCommandRequest buildRequest(String label) {
             ImmutableApplicationCommandRequest.Builder builder = ApplicationCommandRequest.builder().name(label)
-                    .description(ofNullable(this.description))
-                    .dmPermission(this.allowInPrivateMessages);
+                    .description(ofNullable(this.description));
             if (this.l10nDescription != null) {
                 builder.descriptionLocalizationsOrNull(this.l10nDescription);
             }

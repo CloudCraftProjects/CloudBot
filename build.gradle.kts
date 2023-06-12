@@ -13,11 +13,15 @@ group = "dev.booky"
 version = "1.0.0"
 
 repositories {
+    maven("https://oss.sonatype.org/content/repositories/snapshots") {
+        content {
+            includeGroup("com.discord4j")
+        }
+    }
     maven("https://repo.papermc.io/repository/maven-public/")
 }
 
 val configurateVersion = "4.1.2"
-val discord4jVersion = "3.3.0-M1"
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.20-R0.1-SNAPSHOT")
@@ -25,7 +29,9 @@ dependencies {
 
     // downloaded at runtime using library loader
     compileOnlyApi("org.spongepowered:configurate-gson:$configurateVersion")
-    compileOnlyApi("com.discord4j:discord4j-core:$discord4jVersion")
+
+    // integrated library
+    api("com.discord4j:discord4j-core:3.3.0-SNAPSHOT")
 
     // optional dependency
     compileOnlyApi("me.lucko:spark-api:0.1-SNAPSHOT")
@@ -52,12 +58,7 @@ bukkit {
     authors = listOf("booky10")
     softDepend = listOf("spark")
     load = BukkitPluginDescription.PluginLoadOrder.POSTWORLD
-    libraries = listOf(
-        "org.spongepowered:configurate-gson:$configurateVersion",
-        "com.discord4j:discord4j-core:$discord4jVersion",
-        // requires at runtime, but not loaded transitively by library loader
-        "com.fasterxml.jackson.core:jackson-annotations:2.12.7"
-    )
+    libraries = listOf("org.spongepowered:configurate-gson:$configurateVersion")
 }
 
 tasks {

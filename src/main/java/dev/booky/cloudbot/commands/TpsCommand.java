@@ -16,6 +16,7 @@ import me.lucko.spark.api.statistic.StatisticWindow.TicksPerSecond;
 import me.lucko.spark.api.statistic.misc.DoubleAverageInfo;
 import me.lucko.spark.api.statistic.types.DoubleStatistic;
 import me.lucko.spark.api.statistic.types.GenericStatistic;
+import org.bukkit.Bukkit;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -26,6 +27,11 @@ public final class TpsCommand extends AbstractBotCommand {
 
     public TpsCommand(CloudBotManager manager) {
         super(manager, "tps");
+    }
+
+    @Override
+    public boolean shouldRegister() {
+        return Bukkit.getPluginManager().getPlugin("spark") != null;
     }
 
     @Override
