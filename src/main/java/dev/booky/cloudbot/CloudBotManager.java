@@ -8,6 +8,7 @@ import dev.booky.cloudbot.dclistener.MemberCounterListener;
 import dev.booky.cloudbot.dclistener.ReactionRoleListener;
 import dev.booky.cloudbot.events.DcEventHandler;
 import dev.booky.cloudbot.events.DcEventManager;
+import dev.booky.cloudbot.events.DcListener;
 import dev.booky.cloudbot.events.custom.MainGuildDataReloadEvent;
 import dev.booky.cloudbot.i18n.TranslationManager;
 import dev.booky.cloudbot.i18n.Translator;
@@ -41,7 +42,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-public final class CloudBotManager {
+public final class CloudBotManager implements DcListener {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("CloudBot");
 
@@ -203,6 +204,7 @@ public final class CloudBotManager {
     }
 
     private Mono<Void> registerEvents(GatewayDiscordClient gateway) {
+        this.eventManager.register(this);
         this.eventManager.register(new CommandListener(this));
         this.eventManager.register(new InviteListener(this));
         this.eventManager.register(new JoinLeaveMessageListener(this));
