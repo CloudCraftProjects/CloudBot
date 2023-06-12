@@ -73,4 +73,8 @@ tasks {
     build {
         dependsOn(shadowJar)
     }
+
+    withType<JavaCompile> {
+        options.compilerArgs.add("-Xlint:deprecation")
+    }
 }

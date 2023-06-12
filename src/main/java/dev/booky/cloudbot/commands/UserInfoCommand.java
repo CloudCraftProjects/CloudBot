@@ -125,9 +125,9 @@ public final class UserInfoCommand extends AbstractBotCommand {
                 .toList();
 
         StringBuilder description = new StringBuilder("> **Discord Info**\n" +
-                "Username: `" + MarkdownEscape.codeEscape(target.getUsername()) + "`\n" +
+                (target.getGlobalName().map(name -> "Displayname: `" + MarkdownEscape.codeEscape(name) + "`\n").orElse("")) +
+                "Username: `" + MarkdownEscape.codeEscape(target.getTag()) + "`\n" +
                 (nickname.map(name -> "Nickname: `" + name + "`\n").orElse("")) +
-                "Discriminator: `#" + target.getDiscriminator() + "`\n" +
                 "Id: `" + target.getId().asString() + "`\n" +
                 "Mention: " + target.getMention() + "\n" +
                 "User-Avatar: " + target.getAvatarUrl() + "\n" +
