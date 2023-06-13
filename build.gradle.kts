@@ -25,6 +25,8 @@ val configurateVersion = "4.1.2"
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.20-R0.1-SNAPSHOT")
+
+    // already included as server, not exposed in api
     compileOnlyApi("org.spongepowered:configurate-yaml:$configurateVersion")
 
     // downloaded at runtime using library loader

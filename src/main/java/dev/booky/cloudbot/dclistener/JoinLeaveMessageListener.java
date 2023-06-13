@@ -14,6 +14,9 @@ import discord4j.core.object.entity.channel.TextChannel;
 import discord4j.rest.util.AllowedMentions;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
+import java.util.Map;
+
 public final class JoinLeaveMessageListener implements DcListener {
 
     private final CloudBotManager manager;
@@ -28,7 +31,13 @@ public final class JoinLeaveMessageListener implements DcListener {
             return Mono.empty();
         }
 
-        String msg = msgCfg.getMessage();
+        Map<String, ?> props = Map.of(
+                "displayname", member.getGlobalName().orElse(member.getTag()),
+                "username", member.getTag(),
+                "mention", member.getMention(),
+                "avatar", member.getEffectiveAvatarUrl(),
+                "join_time", member.getJoinTime().map(Instant::getEpochSecond).orElse(0L));
+        String msg = msgCfg.getMessage(props);
         if (msg == null) {
             return Mono.empty();
         }
@@ -36,7 +45,7 @@ public final class JoinLeaveMessageListener implements DcListener {
         return mainGuild.getChannelById(Snowflake.of(msgCfg.getChannelId()))
                 .filter(channel -> channel instanceof TextChannel)
                 .map(channel -> (TextChannel) channel)
-                .flatMap(channel -> channel.createMessage(msg.formatted(member.getMention()))
+                .flatMap(channel -> channel.createMessage(msg)
                         .withAllowedMentions(AllowedMentions.builder().allowUser(member.getId()).build()))
                 .then();
     }

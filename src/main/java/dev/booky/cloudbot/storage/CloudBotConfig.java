@@ -70,12 +70,23 @@ public class CloudBotConfig {
         }
 
         public @Nullable String getMessage() {
+            return this.getMessage(Map.of());
+        }
+
+        public @Nullable String getMessage(Map<String, ?> props) {
             if (this.messages.isEmpty()) {
                 return null;
             }
 
             int randomIndex = ThreadLocalRandom.current().nextInt(this.messages.size());
-            return this.messages.get(randomIndex);
+            String message = this.messages.get(randomIndex);
+
+            for (Map.Entry<String, ?> prop : props.entrySet()) {
+                String key = "${" + prop.getKey() + "}";
+                String val = String.valueOf(prop.getValue());
+                message = message.replace(key, val);
+            }
+            return message;
         }
 
         public long getChannelId() {
