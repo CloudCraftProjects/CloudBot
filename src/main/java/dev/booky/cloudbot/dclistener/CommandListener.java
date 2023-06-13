@@ -8,6 +8,7 @@ import dev.booky.cloudbot.commands.ListCommand;
 import dev.booky.cloudbot.commands.MessageCommand;
 import dev.booky.cloudbot.commands.PingCommand;
 import dev.booky.cloudbot.commands.PluginsCommand;
+import dev.booky.cloudbot.commands.ReloadConfigCommand;
 import dev.booky.cloudbot.commands.TeamMembersCommand;
 import dev.booky.cloudbot.commands.TpsCommand;
 import dev.booky.cloudbot.commands.UserInfoCommand;
@@ -58,6 +59,7 @@ public final class CommandListener implements DcListener {
                         new MessageCommand(manager),
                         new PingCommand(manager),
                         new PluginsCommand(manager),
+                        new ReloadConfigCommand(manager),
                         new TeamMembersCommand(manager),
                         new TpsCommand(manager),
                         new UserInfoCommand(manager),
