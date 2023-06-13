@@ -34,11 +34,8 @@ public final class CloudBotMain extends JavaPlugin {
 
         Bukkit.getPluginManager().registerEvents(new LoginListener(this.manager), this);
 
-        Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
-            if (this.manager.isDirty()) {
-                this.manager.saveStorages();
-            }
-        }, 20, 5 * 60 * 20);
+        Bukkit.getScheduler().runTaskTimerAsynchronously(this,
+                () -> this.manager.saveStorages(), 20, 5 * 60 * 20);
     }
 
     @Override

@@ -69,9 +69,11 @@ public final class CloudBotManager implements DcListener {
 
     private final DcEventManager eventManager = new DcEventManager();
 
+    private final Object diskLock = new Object();
     private CloudBotStorage storage;
+    private boolean dirtyStorage = false;
     private CloudBotConfig config;
-    private boolean isDirty = false;
+    private boolean dirtyConfig = false;
 
     private final Path storagePath;
     private final Path configPath;
@@ -92,7 +94,7 @@ public final class CloudBotManager implements DcListener {
         try {
             consumer.accept(this.getConfig());
         } finally {
-            this.isDirty = true;
+            this.dirtyConfig = true;
         }
     }
 
@@ -100,7 +102,7 @@ public final class CloudBotManager implements DcListener {
         try {
             consumer.accept(this.getStorage());
         } finally {
-            this.isDirty = true;
+            this.dirtyStorage = true;
         }
     }
 
@@ -114,9 +116,11 @@ public final class CloudBotManager implements DcListener {
 
     public Mono<Void> reloadStorages(@Nullable GatewayDiscordClient gateway, @Nullable ShardInfo shardInfo) {
         return Mono.defer(() -> {
-            this.config = ConfigLoader.loadObject(this.configPath, CloudBotConfig.class, FileType.YAML);
-            this.storage = ConfigLoader.loadObject(this.storagePath, CloudBotStorage.class, FileType.JSON);
-            this.i18n.reload();
+            synchronized (this.diskLock) {
+                this.config = ConfigLoader.loadObject(this.configPath, CloudBotConfig.class, FileType.YAML);
+                this.storage = ConfigLoader.loadObject(this.storagePath, CloudBotStorage.class, FileType.JSON);
+                this.i18n.reload();
+            }
 
             if (gateway != null && shardInfo != null) {
                 return this.reloadMainGuildData(gateway, shardInfo);
@@ -126,8 +130,14 @@ public final class CloudBotManager implements DcListener {
     }
 
     public void saveStorages() {
-        ConfigLoader.saveObject(this.configPath, this.getConfig(), FileType.YAML);
-        ConfigLoader.saveObject(this.storagePath, this.getStorage(), FileType.JSON);
+        synchronized (this.diskLock) {
+            if (this.dirtyConfig) {
+                ConfigLoader.saveObject(this.configPath, this.getConfig(), FileType.YAML);
+            }
+            if (this.dirtyStorage) {
+                ConfigLoader.saveObject(this.storagePath, this.getStorage(), FileType.JSON);
+            }
+        }
     }
 
     public Mono<Guild> reloadMainGuild() {
@@ -248,9 +258,5 @@ public final class CloudBotManager implements DcListener {
 
     public Plugin getPlugin() {
         return this.plugin;
-    }
-
-    public boolean isDirty() {
-        return this.isDirty;
     }
 }
