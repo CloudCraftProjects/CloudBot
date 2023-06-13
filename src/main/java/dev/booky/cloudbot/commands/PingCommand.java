@@ -10,6 +10,8 @@ import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.rest.util.Color;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 
 public final class PingCommand extends AbstractBotCommand {
@@ -28,21 +30,21 @@ public final class PingCommand extends AbstractBotCommand {
 
     @Override
     public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
-        long start = System.currentTimeMillis();
         return event.reply()
                 .withEphemeral(true)
                 .withEmbeds(EmbedCreateSpec.builder()
                         .color(Color.CYAN)
+                        .description(i18n.apply("command.ping.sent", user.getMention()))
+                        .build())
+                .flatMap($ -> event.editReply().withEmbeds(EmbedCreateSpec.builder()
+                        .color(Color.CYAN)
                         .description(i18n.apply("command.ping.waiting", user.getMention()))
-                        .build()).then()
-                .and(Mono.defer(() -> {
-                    long ping = System.currentTimeMillis() - start;
-                    return event.editReply()
-                            .withEmbeds(EmbedCreateSpec.builder()
-                                    .color(Color.CYAN)
-                                    .description(i18n.apply("command.ping.result", user.getMention(), ping))
-                                    .build());
-                }))
+                        .build()))
+                .flatMap(message -> event.editReply().withEmbeds(EmbedCreateSpec.builder()
+                        .color(Color.CYAN)
+                        .description(i18n.apply("command.ping.result", user.getMention(),
+                                Duration.between(message.getEditedTimestamp().orElseThrow(), Instant.now()).toMillis()))
+                        .build()))
                 .then();
     }
 }
