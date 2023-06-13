@@ -206,7 +206,9 @@ public final class CloudBotManager implements DcListener {
     private Mono<Void> registerEvents(GatewayDiscordClient gateway) {
         this.eventManager.register(this);
         this.eventManager.register(new CommandListener(this));
-        this.eventManager.register(new InviteListener(this));
+        if (this.getConfig().isTrackInvites()) {
+            this.eventManager.register(new InviteListener(this));
+        }
         this.eventManager.register(new JoinLeaveMessageListener(this));
         this.eventManager.register(new MemberCounterListener(this));
         this.eventManager.register(new ReactionRoleListener(this));

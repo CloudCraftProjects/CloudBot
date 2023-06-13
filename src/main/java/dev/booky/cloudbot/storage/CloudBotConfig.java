@@ -36,12 +36,14 @@ public class CloudBotConfig {
 
     private String token = "REPLACE_ME";
 
-    private boolean whitelistActive = true;
+    private boolean whitelistActive = false;
     private String inviteLink = "null";
 
     private long mainGuildId = -1L;
     private long logChannelId = -1L;
     private long teamRoleId = -1L;
+
+    private boolean trackInvites = true;
 
     private MemberCounter memberCounter = new MemberCounter();
 
@@ -281,7 +283,7 @@ public class CloudBotConfig {
     }
 
     public boolean isWhitelistActive() {
-        return whitelistActive;
+        return this.whitelistActive;
     }
 
     public @Nullable String getInviteLink() {
@@ -289,15 +291,19 @@ public class CloudBotConfig {
     }
 
     public long getMainGuildId() {
-        return mainGuildId;
+        return this.mainGuildId;
     }
 
     public long getLogChannelId() {
-        return logChannelId;
+        return this.logChannelId;
     }
 
     public long getTeamRoleId() {
         return this.teamRoleId;
+    }
+
+    public boolean isTrackInvites() {
+        return this.trackInvites;
     }
 
     public MemberCounter getMemberCounter() {
