@@ -60,10 +60,15 @@ public final class ReactionRoleListener implements DcListener {
         Set<CloudBotConfig.ReactionRole> roles = this.manager.getConfig().getReactionRoles().get(messageRef);
         if (roles != null && !roles.isEmpty()) {
             return event.getMember()
-                    .map(member -> roles.stream()
-                            .filter(role -> role.getEmoji().equals(event.getEmoji().asFormat()))
-                            .map(role -> member.addRole(Snowflake.of(role.getRoleId())))
-                            .<Mono<Void>>collect(Mono::empty, Mono::and, Mono::and))
+                    .map(member -> {
+                        Mono<Void> mono = Mono.empty();
+                        for (CloudBotConfig.ReactionRole role : roles) {
+                            if (role.getEmoji().equals(event.getEmoji().asFormat())) {
+                                mono = mono.and(member.addRole(Snowflake.of(role.getRoleId()))).then();
+                            }
+                        }
+                        return mono;
+                    })
                     .orElseGet(Mono::empty);
         }
         return Mono.empty();
@@ -85,10 +90,15 @@ public final class ReactionRoleListener implements DcListener {
         return event.getGuildId()
                 .map(guildId -> event.getClient().getGuildById(guildId)
                         .flatMap(guild -> guild.getMemberById(event.getUserId()))
-                        .flatMap(member -> roles.stream()
-                                .filter(role -> role.getEmoji().equals(event.getEmoji().asFormat()))
-                                .map(role -> member.removeRole(Snowflake.of(role.getRoleId())))
-                                .<Mono<Void>>collect(Mono::empty, Mono::and, Mono::and)))
+                        .flatMap(member -> {
+                            Mono<Void> mono = Mono.empty();
+                            for (CloudBotConfig.ReactionRole role : roles) {
+                                if (role.getEmoji().equals(event.getEmoji().asFormat())) {
+                                    mono = mono.and(member.removeRole(Snowflake.of(role.getRoleId()))).then();
+                                }
+                            }
+                            return mono;
+                        }))
                 .orElseGet(Mono::empty);
     }
 
