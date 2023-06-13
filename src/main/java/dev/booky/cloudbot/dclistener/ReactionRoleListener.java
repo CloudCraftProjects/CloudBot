@@ -6,17 +6,18 @@ import dev.booky.cloudbot.events.DcEventHandler;
 import dev.booky.cloudbot.events.DcListener;
 import dev.booky.cloudbot.events.custom.MainGuildDataReloadEvent;
 import dev.booky.cloudbot.storage.CloudBotConfig;
+import dev.booky.cloudbot.storage.MessageRef;
 import discord4j.common.util.Snowflake;
 import discord4j.core.event.domain.message.ReactionAddEvent;
 import discord4j.core.event.domain.message.ReactionRemoveAllEvent;
 import discord4j.core.event.domain.message.ReactionRemoveEvent;
 import discord4j.core.object.entity.Guild;
-import discord4j.core.object.entity.channel.TextChannel;
 import discord4j.core.object.reaction.Reaction;
 import discord4j.core.object.reaction.ReactionEmoji;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 
 public final class ReactionRoleListener implements DcListener {
@@ -30,15 +31,17 @@ public final class ReactionRoleListener implements DcListener {
     public Mono<Void> reloadReactionRoles(Guild mainGuild) {
         return Mono.defer(() -> {
             Mono<Void> mono = Mono.empty();
-            for (Map.Entry<Long, CloudBotConfig.ReactionRole> entry : this.manager.getConfig().getReactionRoles().entrySet()) {
-                ReactionEmoji.Unicode emoji = ReactionEmoji.unicode(entry.getValue().getEmoji());
-                mono = mono.and(mainGuild.getChannelById(Snowflake.of(entry.getValue().getChannelId()))
-                        .filter(channel -> channel instanceof TextChannel)
-                        .map(channel -> (TextChannel) channel)
-                        .flatMap(channel -> channel.getMessageById(Snowflake.of(entry.getKey())))
-                        .filter(message -> message.getReactions().stream()
-                                .map(Reaction::getEmoji).noneMatch(Predicate.isEqual(emoji)))
-                        .flatMap(message -> message.addReaction(emoji))).then();
+            for (Map.Entry<MessageRef, Set<CloudBotConfig.ReactionRole>> entry : this.manager.getConfig().getReactionRoles().entrySet()) {
+                mono = mono.and(entry.getKey().getMessage(mainGuild).flatMap(message -> {
+                    Mono<Void> reactionMono = Mono.empty();
+                    for (CloudBotConfig.ReactionRole role : entry.getValue()) {
+                        ReactionEmoji.Unicode emoji = ReactionEmoji.unicode(role.getEmoji());
+                        if (message.getReactions().stream().map(Reaction::getEmoji).noneMatch(Predicate.isEqual(emoji))) {
+                            reactionMono = reactionMono.and(message.addReaction(emoji).then());
+                        }
+                    }
+                    return reactionMono;
+                }).then());
             }
             return mono;
         });
@@ -53,11 +56,14 @@ public final class ReactionRoleListener implements DcListener {
 
     @DcEventHandler
     public Mono<Void> onReactionAdd(ReactionAddEvent event) {
-        CloudBotConfig.ReactionRole role = this.manager.getConfig()
-                .getReactionRoles().get(event.getMessageId().asLong());
-        if (role != null) {
+        MessageRef messageRef = MessageRef.of(event.getChannelId(), event.getMessageId());
+        Set<CloudBotConfig.ReactionRole> roles = this.manager.getConfig().getReactionRoles().get(messageRef);
+        if (roles != null && !roles.isEmpty()) {
             return event.getMember()
-                    .map(member -> member.addRole(Snowflake.of(role.getRoleId())))
+                    .map(member -> roles.stream()
+                            .filter(role -> role.getEmoji().equals(event.getEmoji().asFormat()))
+                            .map(role -> member.addRole(Snowflake.of(role.getRoleId())))
+                            .<Mono<Void>>collect(Mono::empty, Mono::and, Mono::and))
                     .orElseGet(Mono::empty);
         }
         return Mono.empty();
@@ -65,9 +71,9 @@ public final class ReactionRoleListener implements DcListener {
 
     @DcEventHandler
     public Mono<Void> onReactionRemove(ReactionRemoveEvent event) {
-        CloudBotConfig.ReactionRole role = this.manager.getConfig()
-                .getReactionRoles().get(event.getMessageId().asLong());
-        if (role == null) {
+        MessageRef messageRef = MessageRef.of(event.getChannelId(), event.getMessageId());
+        Set<CloudBotConfig.ReactionRole> roles = this.manager.getConfig().getReactionRoles().get(messageRef);
+        if (roles == null || roles.isEmpty()) {
             return Mono.empty();
         }
 
@@ -79,15 +85,18 @@ public final class ReactionRoleListener implements DcListener {
         return event.getGuildId()
                 .map(guildId -> event.getClient().getGuildById(guildId)
                         .flatMap(guild -> guild.getMemberById(event.getUserId()))
-                        .flatMap(member -> member.removeRole(Snowflake.of(role.getRoleId()))))
+                        .flatMap(member -> roles.stream()
+                                .filter(role -> role.getEmoji().equals(event.getEmoji().asFormat()))
+                                .map(role -> member.removeRole(Snowflake.of(role.getRoleId())))
+                                .<Mono<Void>>collect(Mono::empty, Mono::and, Mono::and)))
                 .orElseGet(Mono::empty);
     }
 
     @DcEventHandler
     public Mono<Void> onReactionRemoveAll(ReactionRemoveAllEvent event) {
-        CloudBotConfig.ReactionRole role = this.manager.getConfig()
-                .getReactionRoles().get(event.getMessageId().asLong());
-        if (role != null) {
+        MessageRef messageRef = MessageRef.of(event.getChannelId(), event.getMessageId());
+        Set<CloudBotConfig.ReactionRole> roles = this.manager.getConfig().getReactionRoles().get(messageRef);
+        if (roles != null && !roles.isEmpty()) {
             // updates and re-reacts to the message
             return event.getGuild().flatMap(this::reloadReactionRoles);
         }

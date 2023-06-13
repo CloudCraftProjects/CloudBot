@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -197,20 +198,15 @@ public class CloudBotConfig {
         }
     }
 
-    private Map<Long, ReactionRole> reactionRoles = Map.of();
+    private Map<MessageRef, Set<ReactionRole>> reactionRoles = Map.of();
 
     @ConfigSerializable
     public static final class ReactionRole {
 
-        private long channelId = -1L;
         private String emoji = "\u2705";
         private long roleId = -1L;
 
         private ReactionRole() {
-        }
-
-        public long getChannelId() {
-            return this.channelId;
         }
 
         public String getEmoji() {
@@ -219,6 +215,21 @@ public class CloudBotConfig {
 
         public long getRoleId() {
             return this.roleId;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (!(obj instanceof ReactionRole role)) return false;
+            if (this.roleId != role.roleId) return false;
+            return Objects.equals(this.emoji, role.emoji);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = this.emoji != null ? this.emoji.hashCode() : 0;
+            result = 31 * result + (int) (this.roleId ^ (this.roleId >>> 32));
+            return result;
         }
     }
 
@@ -266,7 +277,7 @@ public class CloudBotConfig {
         return this.customCommands;
     }
 
-    public Map<Long, ReactionRole> getReactionRoles() {
+    public Map<MessageRef, Set<ReactionRole>> getReactionRoles() {
         return this.reactionRoles;
     }
 }

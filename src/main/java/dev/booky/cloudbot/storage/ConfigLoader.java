@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-public class ConfigLoader {
+public final class ConfigLoader {
 
     private static final Map<Path, GsonConfigurationLoader> GSON_LOADER_CACHE = new HashMap<>();
     private static final Map<Path, YamlConfigurationLoader> YAML_LOADER_CACHE = new HashMap<>();
@@ -30,7 +30,8 @@ public class ConfigLoader {
         return YAML_LOADER_CACHE.computeIfAbsent(path, $ -> YamlConfigurationLoader.builder()
                 .path(path).nodeStyle(NodeStyle.BLOCK).indent(2)
                 .defaultOptions(opts -> opts.serializers(serializers -> serializers
-                        .register(new ColorSerializer())))
+                        .register(new ColorSerializer())
+                        .register(new MessageRefSerializer())))
                 .build());
     }
 
@@ -112,6 +113,27 @@ public class ConfigLoader {
         @Override
         protected Object serialize(Color item, Predicate<Class<?>> typeSupported) {
             return TextColor.color(item.getRGB()).asHexString();
+        }
+    }
+
+    private static final class MessageRefSerializer extends ScalarSerializer<MessageRef> {
+
+        private MessageRefSerializer() {
+            super(MessageRef.class);
+        }
+
+        @Override
+        public MessageRef deserialize(Type type, Object obj) throws SerializationException {
+            try {
+                return MessageRef.of(String.valueOf(obj));
+            } catch (IllegalArgumentException exception) {
+                throw new SerializationException(exception);
+            }
+        }
+
+        @Override
+        protected Object serialize(MessageRef item, Predicate<Class<?>> typeSupported) {
+            return item.getChannelId() + "-" + item.getMessageId();
         }
     }
 }
