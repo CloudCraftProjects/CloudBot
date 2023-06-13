@@ -3,11 +3,17 @@ package dev.booky.cloudbot.storage;
 
 import com.google.common.base.Preconditions;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
+import discord4j.core.object.command.ApplicationCommandInteractionOption;
+import discord4j.core.object.command.ApplicationCommandInteractionOptionValue;
+import discord4j.core.object.command.ApplicationCommandOption;
 import discord4j.core.object.entity.User;
 import discord4j.core.spec.EmbedCreateSpec;
+import discord4j.core.spec.InteractionApplicationCommandCallbackReplyMono;
+import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.discordjson.possible.Possible;
+import discord4j.rest.util.AllowedMentions;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.Permission;
 import discord4j.rest.util.PermissionSet;
@@ -20,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -117,7 +124,6 @@ public class CloudBotConfig {
         @ConfigSerializable
         public static final class CommandResponse {
 
-            private boolean ephemeral = true;
             private ResponseType responseType = ResponseType.EMPTY;
             private String content = null;
             private String title = null;
@@ -130,38 +136,51 @@ public class CloudBotConfig {
 
                 EMPTY {
                     @Override
-                    protected Mono<Void> reply(ChatInputInteractionEvent event, CommandResponse data) {
-                        return event.reply("\u200B")
-                                .withEphemeral(data.ephemeral);
+                    protected InteractionApplicationCommandCallbackReplyMono reply0(
+                            InteractionApplicationCommandCallbackReplyMono reply, User user, CommandResponse data) {
+                        return reply.withContent("\u200B");
                     }
                 },
                 MESSAGE {
                     @Override
-                    protected Mono<Void> reply(ChatInputInteractionEvent event, CommandResponse data) {
+                    protected InteractionApplicationCommandCallbackReplyMono reply0(
+                            InteractionApplicationCommandCallbackReplyMono reply, User user, CommandResponse data) {
                         Preconditions.checkState(data.content != null, "No content specified in response data");
-                        return event.reply(data.content)
-                                .withEphemeral(data.ephemeral);
+                        return reply.withContent(data.content);
                     }
                 },
                 EMBED {
                     @Override
-                    protected Mono<Void> reply(ChatInputInteractionEvent event, CommandResponse data) {
+                    protected InteractionApplicationCommandCallbackReplyMono reply0(
+                            InteractionApplicationCommandCallbackReplyMono reply, User user, CommandResponse data) {
                         Preconditions.checkState(data.content != null || data.title != null,
                                 "No content and no title specified in response data");
-                        User user = event.getInteraction().getUser();
-                        return event.reply()
-                                .withEphemeral(data.ephemeral)
-                                .withEmbeds(EmbedCreateSpec.builder()
-                                        .description(ofNullable(data.content))
-                                        .title(ofNullable(data.title))
-                                        .color(ofNullable(data.color))
-                                        .footer(user.getTag(), user.getAvatarUrl())
-                                        .timestamp(Instant.now())
-                                        .build());
+                        return reply.withEmbeds(EmbedCreateSpec.builder()
+                                .description(ofNullable(data.content))
+                                .title(ofNullable(data.title))
+                                .color(ofNullable(data.color))
+                                .footer(user.getTag(), user.getAvatarUrl())
+                                .timestamp(Instant.now())
+                                .build());
                     }
                 };
 
-                protected abstract Mono<Void> reply(ChatInputInteractionEvent event, CommandResponse data);
+                protected abstract InteractionApplicationCommandCallbackReplyMono reply0(
+                        InteractionApplicationCommandCallbackReplyMono reply, User user, CommandResponse data);
+
+                protected Mono<Void> reply(ChatInputInteractionEvent event, Optional<User> target, CommandResponse data) {
+                    InteractionApplicationCommandCallbackReplyMono reply = this.reply0(
+                            event.reply(), event.getInteraction().getUser(), data);
+
+                    if (target.isEmpty()) {
+                        return reply.withEphemeral(true);
+                    }
+
+                    String content = (target.get().getMention() + " " + reply.contentOrElse("")).trim();
+                    reply = reply.withContent(content).withEphemeral(false);
+                    reply = reply.withAllowedMentions(AllowedMentions.builder().allowUser(target.get().getId()).build());
+                    return reply;
+                }
             }
         }
 
@@ -187,6 +206,16 @@ public class CloudBotConfig {
                 PermissionSet permissions = PermissionSet.of(this.permissions.toArray(new Permission[0]));
                 builder.defaultMemberPermissions(Long.toString(permissions.getRawValue()));
             }
+
+            builder.addOption(ApplicationCommandOptionData.builder()
+                    .name("target")
+                    .nameLocalizationsOrNull(Map.of("de", "ziel"))
+                    .description("The user to mention on execution")
+                    .descriptionLocalizationsOrNull(Map.of("de", "Der Nutzer, welcher bei Ausführung gepingt werden soll"))
+                    .type(ApplicationCommandOption.Type.USER.getValue())
+                    .required(false)
+                    .build());
+
             return builder.build();
         }
 
@@ -199,7 +228,12 @@ public class CloudBotConfig {
                     response = l10nResponse;
                 }
             }
-            return response.responseType.reply(event, response);
+
+            Optional<User> target = event.getOption("target")
+                    .flatMap(ApplicationCommandInteractionOption::getValue)
+                    .map(ApplicationCommandInteractionOptionValue::asUser)
+                    .flatMap(Mono::blockOptional);
+            return response.responseType.reply(event, target, response);
         }
     }
 
