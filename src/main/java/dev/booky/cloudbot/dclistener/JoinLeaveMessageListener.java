@@ -26,6 +26,10 @@ public final class JoinLeaveMessageListener implements DcListener {
     }
 
     public Mono<Void> sendRandomMessage(Member member, CloudBotConfig.RandomMessages msgCfg) {
+        if (member.isBot() && !msgCfg.isAllowBots()) {
+            return Mono.empty();
+        }
+
         Guild mainGuild = this.manager.getMainGuild();
         if (mainGuild == null || msgCfg.getChannelId() == -1L) {
             return Mono.empty();

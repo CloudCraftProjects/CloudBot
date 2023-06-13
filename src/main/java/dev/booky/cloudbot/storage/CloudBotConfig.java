@@ -67,6 +67,7 @@ public class CloudBotConfig {
     @ConfigSerializable
     public static final class RandomMessages {
 
+        private boolean allowBots = true;
         private long channelId = -1L;
         private List<String> messages = List.of();
 
@@ -91,6 +92,10 @@ public class CloudBotConfig {
                 message = message.replace(key, val);
             }
             return message;
+        }
+
+        public boolean isAllowBots() {
+            return this.allowBots;
         }
 
         public long getChannelId() {
