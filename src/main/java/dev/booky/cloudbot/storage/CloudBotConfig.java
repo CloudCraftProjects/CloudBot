@@ -7,16 +7,22 @@ import discord4j.core.object.command.ApplicationCommandInteractionOption;
 import discord4j.core.object.command.ApplicationCommandInteractionOptionValue;
 import discord4j.core.object.command.ApplicationCommandOption;
 import discord4j.core.object.entity.User;
+import discord4j.core.object.presence.Activity;
+import discord4j.core.object.presence.ClientActivity;
+import discord4j.core.object.presence.ClientPresence;
+import discord4j.core.object.presence.Status;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.core.spec.InteractionApplicationCommandCallbackReplyMono;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.discordjson.possible.Possible;
+import discord4j.gateway.ShardInfo;
 import discord4j.rest.util.AllowedMentions;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.Permission;
 import discord4j.rest.util.PermissionSet;
+import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.configurate.objectmapping.ConfigSerializable;
 import reactor.core.publisher.Mono;
@@ -94,13 +100,7 @@ public class CloudBotConfig {
 
             int randomIndex = ThreadLocalRandom.current().nextInt(this.messages.size());
             String message = this.messages.get(randomIndex);
-
-            for (Map.Entry<String, ?> prop : props.entrySet()) {
-                String key = "${" + prop.getKey() + "}";
-                String val = String.valueOf(prop.getValue());
-                message = message.replace(key, val);
-            }
-            return message;
+            return replaceProps(message, props);
         }
 
         public boolean isAllowBots() {
@@ -274,8 +274,57 @@ public class CloudBotConfig {
         }
     }
 
+    private Presence presence = new Presence();
+
+    @ConfigSerializable
+    public static final class Presence {
+
+        private Status status = Status.ONLINE;
+
+        private Activity.Type activityType = Activity.Type.UNKNOWN;
+        private String activityName = "none";
+        private String activityUrl = null;
+
+        private Presence() {
+        }
+
+        public @Nullable ClientActivity buildActivity(ShardInfo shardInfo) {
+            if (this.activityType == Activity.Type.UNKNOWN) {
+                return null;
+            }
+
+            Map<String, ?> props = Map.of(
+                    "player_count", Bukkit.getOnlinePlayers().size(),
+                    "max_players", Bukkit.getMaxPlayers(),
+                    "shard_index", shardInfo.getIndex(),
+                    "shard_count", shardInfo.getCount(),
+                    "shard_str", shardInfo.getIndex() + "/" + shardInfo.getCount());
+
+            String name = replaceProps(this.activityName, props);
+            String url = replaceProps(this.activityUrl, props);
+            return ClientActivity.of(this.activityType, name, url);
+        }
+
+        public Status getStatus() {
+            return this.status;
+        }
+    }
+
     @SuppressWarnings("unused") // configurate
     private CloudBotConfig() {
+    }
+
+    private static String replaceProps(String string, Map<String, ?> props) {
+        for (Map.Entry<String, ?> prop : props.entrySet()) {
+            String key = "${" + prop.getKey() + "}";
+            String val = String.valueOf(prop.getValue());
+            string = string.replace(key, val);
+        }
+        return string;
+    }
+
+    public ClientPresence buildPresence(ShardInfo shardInfo) {
+        return ClientPresence.of(this.presence.status, this.presence.buildActivity(shardInfo));
     }
 
     public String getToken() {

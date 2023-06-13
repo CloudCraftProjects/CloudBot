@@ -169,6 +169,7 @@ public final class CloudBotManager implements DcListener {
                 .build()
                 .gateway()
                 .setEnabledIntents(IntentSet.of(Intent.GUILD_MEMBERS, Intent.GUILD_INVITES, Intent.GUILD_MESSAGE_REACTIONS))
+                .setInitialPresence(info -> this.getConfig().buildPresence(info))
                 .withGateway(gateway -> {
                     this.gateway = gateway;
                     return this.registerEvents(gateway).then()
@@ -244,6 +245,14 @@ public final class CloudBotManager implements DcListener {
         return Objects.requireNonNull(this.storage, "Storage has not been loaded yet");
     }
 
+    public Plugin getPlugin() {
+        return this.plugin;
+    }
+
+    public GatewayDiscordClient getGateway() {
+        return this.gateway;
+    }
+
     public @Nullable Guild getMainGuild() {
         return this.mainGuild;
     }
@@ -254,9 +263,5 @@ public final class CloudBotManager implements DcListener {
 
     public DcEventManager getEventManager() {
         return this.eventManager;
-    }
-
-    public Plugin getPlugin() {
-        return this.plugin;
     }
 }

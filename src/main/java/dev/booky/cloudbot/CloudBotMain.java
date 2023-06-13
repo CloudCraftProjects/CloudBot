@@ -2,6 +2,8 @@ package dev.booky.cloudbot;
 // Created by booky10 in CloudBot (15:48 10.10.22)
 
 import dev.booky.cloudbot.listener.LoginListener;
+import discord4j.core.GatewayDiscordClient;
+import discord4j.gateway.ShardInfo;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -34,8 +36,19 @@ public final class CloudBotMain extends JavaPlugin {
 
         Bukkit.getPluginManager().registerEvents(new LoginListener(this.manager), this);
 
-        Bukkit.getScheduler().runTaskTimerAsynchronously(this,
-                () -> this.manager.saveStorages(), 20, 5 * 60 * 20);
+        Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+            this.manager.saveStorages();
+
+            // update presence
+            GatewayDiscordClient gateway = this.manager.getGateway();
+            if (gateway != null) {
+                int shardCount = gateway.getGatewayClientGroup().getShardCount();
+                for (int i = 0; i < shardCount; i++) {
+                    ShardInfo shardInfo = ShardInfo.create(i, shardCount);
+                    gateway.updatePresence(this.manager.getConfig().buildPresence(shardInfo));
+                }
+            }
+        }, 20, 30 * 20);
     }
 
     @Override
