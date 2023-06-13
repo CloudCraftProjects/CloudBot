@@ -9,6 +9,8 @@ import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.discordjson.possible.Possible;
 import discord4j.rest.util.Color;
+import discord4j.rest.util.Permission;
+import discord4j.rest.util.PermissionSet;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.configurate.objectmapping.ConfigSerializable;
 import reactor.core.publisher.Mono;
@@ -17,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 @SuppressWarnings("FieldMayBeFinal") // configurate
@@ -103,6 +106,7 @@ public class CloudBotConfig {
         private Map<String, String> l10nDescription = null;
         private CommandResponse response = new CommandResponse();
         private Map<String, CommandResponse> l10nResponse = null;
+        private Set<Permission> permissions = PermissionSet.none();
 
         @ConfigSerializable
         public static final class CommandResponse {
@@ -170,6 +174,12 @@ public class CloudBotConfig {
                     .description(ofNullable(this.description));
             if (this.l10nDescription != null) {
                 builder.descriptionLocalizationsOrNull(this.l10nDescription);
+            }
+            if (this.permissions.isEmpty()) {
+                builder.defaultPermission(true);
+            } else {
+                PermissionSet permissions = PermissionSet.of(this.permissions.toArray(new Permission[0]));
+                builder.defaultMemberPermissions(Long.toString(permissions.getRawValue()));
             }
             return builder.build();
         }
