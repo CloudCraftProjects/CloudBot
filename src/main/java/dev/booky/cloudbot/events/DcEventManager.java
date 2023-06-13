@@ -30,11 +30,9 @@ public final class DcEventManager {
         } while (eventClass != Event.class && eventClass != null);
         events.sort(Comparator.comparingInt(EventEntry::priority));
 
-        System.out.println("dispatching " + event.getClass().getSimpleName() + " to " + events.size() + " receivers");
         Mono<Void> mono = Mono.empty();
         for (EventEntry entry : events) {
             Mono<Void> entryMono = entry.invoke(event);
-            System.out.println("invoked invoker of " + entry.listener().getClass().getSimpleName() + ": " + entry.invoker());
             if (entryMono != Mono.<Void>empty()) {
                 mono = mono.and(entryMono);
             }
