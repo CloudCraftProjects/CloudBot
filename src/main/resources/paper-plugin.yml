@@ -1,0 +1,15 @@
+name: CloudBot
+version: ${version}
+author: booky10
+api-version: '1.19'
+main: dev.booky.cloudbot.CloudBotMain
+loader: dev.booky.cloudbot.CloudBotLoader
+
+# TODO: switch to now dependencies format
+dependencies:
+  - name: spark
+    required: false
+    bootstrap: false
+load-before:
+  - name: spark
+    bootstrap: false
