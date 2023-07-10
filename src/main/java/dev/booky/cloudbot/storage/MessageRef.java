@@ -7,7 +7,7 @@ import discord4j.core.GatewayDiscordClient;
 import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.channel.Channel;
-import discord4j.core.object.entity.channel.TextChannel;
+import discord4j.core.object.entity.channel.GuildMessageChannel;
 import org.apache.commons.lang3.StringUtils;
 import reactor.core.publisher.Mono;
 
@@ -40,18 +40,18 @@ public final class MessageRef {
         return new MessageRef(channelId, messageId);
     }
 
-    private Mono<TextChannel> toText(Channel channel) {
-        if (channel instanceof TextChannel) {
-            return Mono.just((TextChannel) channel);
+    private Mono<GuildMessageChannel> toText(Channel channel) {
+        if (channel instanceof GuildMessageChannel) {
+            return Mono.just((GuildMessageChannel) channel);
         }
         return Mono.empty();
     }
 
-    public Mono<TextChannel> getChannel(GatewayDiscordClient gateway) {
+    public Mono<GuildMessageChannel> getChannel(GatewayDiscordClient gateway) {
         return gateway.getChannelById(Snowflake.of(this.channelId)).flatMap(this::toText);
     }
 
-    public Mono<TextChannel> getChannel(Guild guild) {
+    public Mono<GuildMessageChannel> getChannel(Guild guild) {
         return guild.getChannelById(Snowflake.of(this.channelId)).flatMap(this::toText);
     }
 

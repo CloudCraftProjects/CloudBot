@@ -27,7 +27,7 @@ import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.User;
-import discord4j.core.object.entity.channel.TextChannel;
+import discord4j.core.object.entity.channel.GuildMessageChannel;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import discord4j.rest.service.ApplicationService;
@@ -106,7 +106,7 @@ public final class CommandListener implements DcListener {
         User user = event.getInteraction().getUser();
         CompletableFuture<Message> logMessage = new CompletableFuture<>();
 
-        TextChannel logChannel = this.manager.getLogChannel();
+        GuildMessageChannel logChannel = this.manager.getLogChannel();
         if (logChannel != null) {
             Optional<Snowflake> guildId = event.getInteraction().getGuildId();
             String location = guildId.map(snowflake -> "Guild: `" + snowflake.asString() + "`\n" +
@@ -153,7 +153,7 @@ public final class CommandListener implements DcListener {
                                       CompletableFuture<Message> logMessage) {
         throwable.printStackTrace();
 
-        TextChannel logChannel = this.manager.getLogChannel();
+        GuildMessageChannel logChannel = this.manager.getLogChannel();
         if (logChannel == null) {
             return Mono.empty();
         }

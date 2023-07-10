@@ -21,7 +21,7 @@ import discord4j.core.object.component.SelectMenu;
 import discord4j.core.object.component.TextInput;
 import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.User;
-import discord4j.core.object.entity.channel.TextChannel;
+import discord4j.core.object.entity.channel.GuildMessageChannel;
 import discord4j.core.object.reaction.ReactionEmoji;
 import discord4j.core.spec.EmbedCreateFields;
 import discord4j.core.spec.EmbedCreateSpec;
@@ -380,8 +380,8 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                     long messageId = inputs.getValue().orElseThrow(AssertionError::new);
                     return message.getGuild()
                             .flatMap(guild -> guild.getChannelById(Snowflake.of(inputs.getKey())))
-                            .filter(channel -> channel instanceof TextChannel)
-                            .map(channel -> (TextChannel) channel)
+                            .filter(channel -> channel instanceof GuildMessageChannel)
+                            .map(channel -> (GuildMessageChannel) channel)
                             .flatMap(channel -> channel.getMessageById(Snowflake.of(messageId)))
                             .flatMap(targetMessage -> message.edit()
                                     .withContentOrNull(targetMessage.getContent())
@@ -402,8 +402,8 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
         return Mono.fromSupplier(() -> this.extractMessageRefInputs(event))
                 .flatMap(inputs -> message.getGuild()
                         .flatMap(guild -> guild.getChannelById(Snowflake.of(inputs.getKey())))
-                        .filter(channel -> channel instanceof TextChannel)
-                        .map(channel -> (TextChannel) channel)
+                        .filter(channel -> channel instanceof GuildMessageChannel)
+                        .map(channel -> (GuildMessageChannel) channel)
                         .flatMap(channel -> {
                             if (inputs.getValue().isEmpty()) {
                                 MessageCreateMono creator = channel.createMessage();

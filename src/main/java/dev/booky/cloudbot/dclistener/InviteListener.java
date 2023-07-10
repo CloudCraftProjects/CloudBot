@@ -7,12 +7,11 @@ import dev.booky.cloudbot.events.DcListener;
 import dev.booky.cloudbot.events.custom.MainGuildDataReloadEvent;
 import discord4j.core.event.domain.InviteCreateEvent;
 import discord4j.core.event.domain.InviteDeleteEvent;
-import discord4j.core.event.domain.guild.GuildDeleteEvent;
 import discord4j.core.event.domain.guild.MemberJoinEvent;
 import discord4j.core.object.ExtendedInvite;
 import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.Member;
-import discord4j.core.object.entity.channel.TextChannel;
+import discord4j.core.object.entity.channel.GuildMessageChannel;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.rest.util.Color;
 import org.slf4j.Logger;
@@ -143,7 +142,7 @@ public final class InviteListener implements DcListener {
                     String inviteUrl = "https://discord.gg/%s".formatted(invite.getCode());
                     LOGGER.info("{} was invited by {}", member.getTag(), inviteUrl);
 
-                    TextChannel logChannel = this.manager.getLogChannel();
+                    GuildMessageChannel logChannel = this.manager.getLogChannel();
                     if (logChannel == null) {
                         return Mono.empty();
                     }

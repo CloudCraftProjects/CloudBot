@@ -24,7 +24,7 @@ import discord4j.core.event.domain.guild.GuildCreateEvent;
 import discord4j.core.event.domain.guild.GuildDeleteEvent;
 import discord4j.core.object.command.Interaction;
 import discord4j.core.object.entity.Guild;
-import discord4j.core.object.entity.channel.TextChannel;
+import discord4j.core.object.entity.channel.GuildMessageChannel;
 import discord4j.gateway.ShardInfo;
 import discord4j.gateway.intent.Intent;
 import discord4j.gateway.intent.IntentSet;
@@ -65,7 +65,7 @@ public final class CloudBotManager implements DcListener {
 
     private GatewayDiscordClient gateway;
     private Guild mainGuild;
-    private TextChannel logChannel;
+    private GuildMessageChannel logChannel;
 
     private final DcEventManager eventManager = new DcEventManager();
 
@@ -204,8 +204,8 @@ public final class CloudBotManager implements DcListener {
                     long channelId = this.getConfig().getLogChannelId();
                     if (channelId != -1L) {
                         return guild.getChannelById(Snowflake.of(channelId))
-                                .filter(channel -> channel instanceof TextChannel)
-                                .map(channel -> (TextChannel) channel)
+                                .filter(channel -> channel instanceof GuildMessageChannel)
+                                .map(channel -> (GuildMessageChannel) channel)
                                 .doOnSuccess(channel -> this.logChannel = channel)
                                 .then();
                     }
@@ -257,7 +257,7 @@ public final class CloudBotManager implements DcListener {
         return this.mainGuild;
     }
 
-    public @Nullable TextChannel getLogChannel() {
+    public @Nullable GuildMessageChannel getLogChannel() {
         return this.logChannel;
     }
 

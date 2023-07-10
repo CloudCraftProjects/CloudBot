@@ -10,7 +10,7 @@ import discord4j.core.event.domain.guild.MemberJoinEvent;
 import discord4j.core.event.domain.guild.MemberLeaveEvent;
 import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.Member;
-import discord4j.core.object.entity.channel.TextChannel;
+import discord4j.core.object.entity.channel.GuildMessageChannel;
 import discord4j.rest.util.AllowedMentions;
 import reactor.core.publisher.Mono;
 
@@ -47,8 +47,8 @@ public final class JoinLeaveMessageListener implements DcListener {
         }
 
         return mainGuild.getChannelById(Snowflake.of(msgCfg.getChannelId()))
-                .filter(channel -> channel instanceof TextChannel)
-                .map(channel -> (TextChannel) channel)
+                .filter(channel -> channel instanceof GuildMessageChannel)
+                .map(channel -> (GuildMessageChannel) channel)
                 .flatMap(channel -> channel.createMessage(msg)
                         .withAllowedMentions(AllowedMentions.builder().allowUser(member.getId()).build()))
                 .then();
