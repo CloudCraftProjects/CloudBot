@@ -78,14 +78,18 @@ public final class WhitelistCommand extends AbstractBotCommand {
                                 builder.append(", ");
                             }
 
-                            String name = McApiUtil.loadProfile(playerId).getUsername();
-                            if (name != null) {
-                                name = MarkdownEscape.escape(name);
-                            } else {
+                            String name = null;
+                            try {
+                                name = McApiUtil.loadProfile(playerId).getUsername();
+                            } catch (IllegalStateException | IllegalArgumentException exception) {
+                                exception.printStackTrace();
+                            }
+
+                            if (name == null) {
                                 name = playerId.toString().substring(0, 8);
                             }
 
-                            builder.append(name);
+                            builder.append(MarkdownEscape.escape(name));
                         }
 
                         if (builder.length() > 4096) {

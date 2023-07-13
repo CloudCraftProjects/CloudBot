@@ -1,6 +1,7 @@
 package dev.booky.cloudbot.util;
 // Created by booky10 in CloudBot (19:20 11.10.22)
 
+import com.destroystokyo.paper.profile.PlayerProfile;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.gson.Gson;
@@ -8,7 +9,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.profile.PlayerProfile;
 
 import java.net.URI;
 import java.net.http.HttpResponse;
@@ -21,7 +21,9 @@ public class McApiUtil {
 
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
     private static final Pattern USERNAME_PATTERN = Pattern.compile("[a-zA-Z0-9_]{3,16}");
+
     private static final URI NAME_URI = URI.create("https://api.mojang.com/users/profiles/minecraft/");
+    private static final URI UUID_URI = URI.create("https://sessionserver.mojang.com/session/minecraft/profile/");
 
     private static final LoadingCache<String, McProfile> NAME_PROFILE_CACHE = Caffeine.newBuilder()
             .expireAfterWrite(1, TimeUnit.DAYS)
@@ -42,20 +44,21 @@ public class McApiUtil {
         return NAME_PROFILE_CACHE.get(username.toLowerCase(Locale.ROOT));
     }
 
-    @SuppressWarnings("deprecation") // Only way to get a profile from an offline player
     private static McProfile loadProfile0(UUID uniqueId) {
-        OfflinePlayer player = Bukkit.getOfflinePlayer(uniqueId);
-        PlayerProfile profile = player.getPlayerProfile();
-
-        if (profile.getName() == null) {
-            profile = profile.update().join();
+        String response = HttpUtil.getJoin(UUID_URI.resolve(uniqueId.toString()), HttpResponse.BodyHandlers.ofString());
+        if (response.isEmpty()) { // Player does not exist
+            throw new IllegalArgumentException("Player '" + uniqueId + "' does not exist");
         }
 
-        McProfile apiProfile = new McProfile(profile.getName(), profile.getUniqueId());
-        if (apiProfile.getUsername() != null) {
-            NAME_PROFILE_CACHE.put(apiProfile.getUsername().toLowerCase(Locale.ROOT), apiProfile);
+        JsonObject jsonResp = GSON.fromJson(response, JsonObject.class);
+        if (!jsonResp.has("name")) {
+            throw new IllegalStateException("Server returned unknown response:\n" + jsonResp);
         }
-        return apiProfile;
+
+        String username = jsonResp.get("name").getAsString();
+        McProfile profile = new McProfile(username, uniqueId);
+        NAME_PROFILE_CACHE.put(username, profile);
+        return profile;
     }
 
     private static McProfile loadProfile0(String username) {
