@@ -33,7 +33,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.plugin.Plugin;
-import org.jetbrains.annotations.Nullable;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
@@ -249,7 +249,7 @@ public final class CloudBotManager implements DcListener {
         return this.plugin;
     }
 
-    public GatewayDiscordClient getGateway() {
+    public @Nullable GatewayDiscordClient getGateway() {
         return this.gateway;
     }
 

@@ -6,6 +6,7 @@ import discord4j.core.GatewayDiscordClient;
 import discord4j.gateway.ShardInfo;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,8 +19,10 @@ public final class CloudBotMain extends JavaPlugin {
 
     @Override
     public void onLoad() {
-        this.manager = new CloudBotManager(this, super.getDataFolder().toPath());
         new Metrics(this, 16636);
+
+        this.manager = new CloudBotManager(this, super.getDataFolder().toPath());
+        Bukkit.getServicesManager().register(CloudBotManager.class, this.manager, this, ServicePriority.Normal);
     }
 
     @Override
