@@ -8,7 +8,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 
 import java.net.URI;
 import java.net.http.HttpResponse;
@@ -88,6 +87,10 @@ public class McApiUtil {
         public McProfile(String username, UUID uniqueId) {
             this.username = username;
             this.uniqueId = uniqueId;
+        }
+
+        public PlayerProfile createBukkit() {
+            return Bukkit.createProfile(this.uniqueId, this.username);
         }
 
         public String getUsername() {

@@ -1,6 +1,7 @@
 package dev.booky.cloudbot.commands;
 // Created by booky10 in CloudBot (15:56 22.10.22)
 
+import com.destroystokyo.paper.profile.PlayerProfile;
 import dev.booky.cloudbot.CloudBotManager;
 import dev.booky.cloudbot.i18n.Translator;
 import dev.booky.cloudbot.util.MarkdownEscape;
@@ -139,7 +140,7 @@ public final class UserInfoCommand extends AbstractBotCommand {
                 "Flags: " + target.getPublicFlags().stream().map(flag -> "`" + flag.name() + "`").collect(Collectors.joining(", ")));
 
         if (!profiles.isEmpty()) {
-            BanList banlist = Bukkit.getBanList(BanList.Type.NAME);
+            BanList<PlayerProfile> banlist = Bukkit.getBanList(BanList.Type.PROFILE);
             description.append("\n\n");
 
             for (McProfile profile : profiles) {
@@ -150,7 +151,7 @@ public final class UserInfoCommand extends AbstractBotCommand {
                         .append(profile.getUniqueId())
                         .append("`)\n");
 
-                BanEntry entry = banlist.getBanEntry(profile.getUniqueId().toString());
+                BanEntry<PlayerProfile> entry = banlist.getBanEntry(profile.createBukkit());
                 if (entry == null) {
                     continue;
                 }
