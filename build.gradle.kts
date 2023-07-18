@@ -1,8 +1,11 @@
+import net.minecrell.pluginyml.bukkit.BukkitPluginDescription
+import net.minecrell.pluginyml.paper.PaperPluginDescription
+
 plugins {
     id("java-library")
     id("maven-publish")
 
-    // id("net.minecrell.plugin-yml.bukkit") version "0.5.3"
+    id("net.minecrell.plugin-yml.paper") version "0.6.0"
     id("xyz.jpenilla.run-paper") version "1.0.6"
     id("com.github.johnrengelman.shadow") version "8.1.1"
 }
@@ -22,14 +25,14 @@ repositories {
 val configurateVersion = "4.1.2"
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.20-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT")
 
     // already included as server, not exposed in api
     compileOnlyApi("org.spongepowered:configurate-yaml:$configurateVersion")
 
     // downloaded at runtime using library loader
-    compileOnlyApi("org.spongepowered:configurate-gson:$configurateVersion")
-    compileOnlyApi("com.discord4j:discord4j-core:3.3.0-SNAPSHOT")
+    paperLibrary(compileOnlyApi("org.spongepowered:configurate-gson:$configurateVersion")!!)
+    paperLibrary(compileOnlyApi("com.discord4j:discord4j-core:3.3.0-SNAPSHOT")!!)
 
     // optional dependency
     compileOnlyApi("me.lucko:spark-api:0.1-SNAPSHOT")
@@ -50,17 +53,25 @@ publishing {
     }
 }
 
-// TODO
-// bukkit {
-//     main = "$group.cloudbot.CloudBotMain"
-//     apiVersion = "1.19"
-//     authors = listOf("booky10")
-//     softDepend = listOf("spark")
-//     load = BukkitPluginDescription.PluginLoadOrder.POSTWORLD
-//     libraries = listOf(
-//         "org.spongepowered:configurate-gson:$configurateVersion",
-//         "com.discord4j:discord4j-core:$discord4jVersion")
-// }
+ paper {
+     // generates a json file into our runtime jar
+     // this lists all libraries, which are then downloaded using paper plugin loaders
+     generateLibrariesJson = true
+
+     main = "$group.cloudbot.CloudBotMain"
+     loader = "$group.cloudbot.CloudBotLoader"
+
+     apiVersion = "1.20"
+     authors = listOf("booky10")
+     load = BukkitPluginDescription.PluginLoadOrder.POSTWORLD
+
+     serverDependencies {
+         register("spark") {
+             load = PaperPluginDescription.RelativeLoadOrder.BEFORE
+             required = false
+         }
+     }
+ }
 
 tasks {
     runServer {
@@ -71,15 +82,8 @@ tasks {
         relocate("org.bstats", "dev.booky.cloudbot.bstats")
     }
 
-    build {
+    assemble {
         dependsOn(shadowJar)
-    }
-
-    processResources {
-        inputs.property("version", project.version)
-        filesMatching("paper-plugin.yml") {
-            expand("version" to project.version)
-        }
     }
 
     withType<JavaCompile> {
