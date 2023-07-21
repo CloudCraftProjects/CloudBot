@@ -5,9 +5,9 @@ plugins {
     id("java-library")
     id("maven-publish")
 
-    id("net.minecrell.plugin-yml.paper") version "0.6.0"
-    id("xyz.jpenilla.run-paper") version "1.0.6"
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    alias(libs.plugins.pluginyml.paper)
+    alias(libs.plugins.runpaper)
+    alias(libs.plugins.shadow)
 }
 
 group = "dev.booky"
@@ -22,28 +22,31 @@ repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
 }
 
-val configurateVersion = "4.1.2"
-
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT")
+    compileOnly(libs.paperapi)
 
     // already included as server, not exposed in api
-    compileOnlyApi("org.spongepowered:configurate-yaml:$configurateVersion")
+    compileOnlyApi(libs.configurate.yaml)
 
     // downloaded at runtime using library loader
-    paperLibrary(compileOnlyApi("org.spongepowered:configurate-gson:$configurateVersion")!!)
-    paperLibrary(compileOnlyApi("com.discord4j:discord4j-core:3.3.0-SNAPSHOT")!!)
+    sequenceOf(
+        libs.configurate.gson,
+        libs.discord4j.core
+    ).forEach {
+        compileOnlyApi(it)
+        paperLibrary(it)
+    }
 
     // optional dependency
-    compileOnlyApi("me.lucko:spark-api:0.1-SNAPSHOT")
+    compileOnlyApi(libs.spark.api)
 
     // integrated metrics
-    implementation("org.bstats:bstats-bukkit:3.0.0")
+    implementation(libs.bstats)
 }
 
 java {
     withSourcesJar()
-    toolchain{
+    toolchain {
         languageVersion.set(JavaLanguageVersion.of(17))
         vendor.set(JvmVendorSpec.ADOPTIUM)
     }
@@ -60,29 +63,29 @@ publishing {
     }
 }
 
- paper {
-     // generates a json file into our runtime jar
-     // this lists all libraries, which are then downloaded using paper plugin loaders
-     generateLibrariesJson = true
+paper {
+    // generates a json file into our runtime jar
+    // this lists all libraries, which are then downloaded using paper plugin loaders
+    generateLibrariesJson = true
 
-     main = "$group.cloudbot.CloudBotMain"
-     loader = "$group.cloudbot.CloudBotLoader"
+    main = "$group.cloudbot.CloudBotMain"
+    loader = "$group.cloudbot.CloudBotLoader"
 
-     apiVersion = "1.20"
-     authors = listOf("booky10")
-     load = BukkitPluginDescription.PluginLoadOrder.POSTWORLD
+    apiVersion = "1.20"
+    authors = listOf("booky10")
+    load = BukkitPluginDescription.PluginLoadOrder.POSTWORLD
 
-     serverDependencies {
-         register("spark") {
-             load = PaperPluginDescription.RelativeLoadOrder.BEFORE
-             required = false
-         }
-     }
- }
+    serverDependencies {
+        register("spark") {
+            load = PaperPluginDescription.RelativeLoadOrder.BEFORE
+            required = false
+        }
+    }
+}
 
 tasks {
     runServer {
-        minecraftVersion("1.20.1")
+        minecraftVersion(libs.versions.minecraft.get())
     }
 
     shadowJar {

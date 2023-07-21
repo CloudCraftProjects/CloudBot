@@ -1,0 +1,24 @@
+[plugins]
+pluginyml-paper = "net.minecrell.plugin-yml.paper:0.6.0"
+runpaper = "xyz.jpenilla.run-paper:2.1.0"
+shadow = "com.github.johnrengelman.shadow:8.1.1"
+
+[versions]
+minecraft = "1.20.1"
+paperapi = "1.20.1-R0.1-SNAPSHOT"
+
+configurate = "4.1.2"
+bstats = "3.0.2"
+
+discord4j = "3.3.0-SNAPSHOT"
+spark-api = "0.1-SNAPSHOT"
+
+[libraries]
+paperapi = { module = "io.papermc.paper:paper-api", version.ref = "paperapi" }
+
+configurate-yaml = { module = "org.spongepowered:configurate-yaml", version.ref = "configurate" }
+configurate-gson = { module = "org.spongepowered:configurate-gson", version.ref = "configurate" }
+bstats = { module = "org.bstats:bstats-bukkit", version.ref = "bstats" }
+
+discord4j-core = { module = "com.discord4j:discord4j-core", version.ref = "discord4j" }
+spark-api = { module = "me.lucko:spark-api", version.ref = "spark-api" }
