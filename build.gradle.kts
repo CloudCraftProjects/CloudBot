@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "dev.booky"
-version = "1.0.0"
+version = "1.0.1-SNAPSHOT"
 
 repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots/") {
@@ -43,13 +43,20 @@ dependencies {
 
 java {
     withSourcesJar()
-    toolchain.languageVersion.set(JavaLanguageVersion.of(17))
+    toolchain{
+        languageVersion.set(JavaLanguageVersion.of(17))
+        vendor.set(JvmVendorSpec.ADOPTIUM)
+    }
 }
 
 publishing {
     publications.create<MavenPublication>("maven") {
         artifactId = project.name.lowercase()
         from(components["java"])
+    }
+    repositories.maven("https://maven.pkg.github.com/CloudCraftProjects/CloudBot/") {
+        name = "github"
+        credentials(PasswordCredentials::class.java)
     }
 }
 
@@ -75,11 +82,11 @@ publishing {
 
 tasks {
     runServer {
-        minecraftVersion("1.20")
+        minecraftVersion("1.20.1")
     }
 
     shadowJar {
-        relocate("org.bstats", "dev.booky.cloudbot.bstats")
+        relocate("org.bstats", "${project.group}.cloudbot.bstats")
     }
 
     assemble {
