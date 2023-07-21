@@ -44,6 +44,20 @@ public final class TpsCommand extends AbstractBotCommand {
 
     @Override
     public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
+        // needs to be in a separate class because of classloading things
+        EmbedCreateSpec embedCreateSpec = SparkUtil.provideEmbedCreateSpec();
+        return event.reply()
+                .withEphemeral(true)
+                .withEmbeds(embedCreateSpec);
+    }
+}
+
+final class SparkUtil {
+
+    private SparkUtil() {
+    }
+
+    public static EmbedCreateSpec provideEmbedCreateSpec() {
         Spark spark = SparkProvider.get();
         StringBuilder descBuilder = new StringBuilder();
 
@@ -88,13 +102,11 @@ public final class TpsCommand extends AbstractBotCommand {
             embedColor = Color.RED;
         }
 
-        return event.reply()
-                .withEphemeral(true)
-                .withEmbeds(EmbedCreateSpec.builder()
-                        .description(descBuilder.toString())
-                        .timestamp(Instant.now())
-                        .footer("\u26A1 Powered by Spark", null)
-                        .color(embedColor)
-                        .build());
+        return EmbedCreateSpec.builder()
+                .description(descBuilder.toString())
+                .timestamp(Instant.now())
+                .footer("\u26A1 Powered by Spark", null)
+                .color(embedColor)
+                .build();
     }
 }
