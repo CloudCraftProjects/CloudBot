@@ -3,6 +3,7 @@ package dev.booky.cloudbot.commands;
 
 import dev.booky.cloudbot.CloudBotManager;
 import dev.booky.cloudbot.i18n.Translator;
+import dev.booky.cloudbot.util.DiscordComponentRenderer;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.command.ApplicationCommandInteractionOption;
 import discord4j.core.object.command.ApplicationCommandInteractionOptionValue;
@@ -12,14 +13,18 @@ import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.rest.util.Permission;
 import discord4j.rest.util.PermissionSet;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.translation.GlobalTranslator;
+import org.apache.commons.lang3.StringUtils;
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import reactor.core.publisher.Mono;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -60,15 +65,19 @@ public final class ExecuteCommand extends AbstractBotCommand {
             List<String> feedback = new ArrayList<>();
             AtomicBoolean updating = new AtomicBoolean();
 
-            Bukkit.dispatchCommand(Bukkit.createCommandSender(msg -> {
-                String[] plainMsg = PlainTextComponentSerializer.plainText().serialize(msg).split("\n");
+            CommandSender[] sender = new CommandSender[1];
+            sender[0] = Bukkit.createCommandSender(msg -> {
+                Component translatedMessage = GlobalTranslator.render(msg, Locale.getDefault());
+                String ansiMessage = DiscordComponentRenderer.render(translatedMessage);
+
+                String[] lines = StringUtils.split(ansiMessage, '\n');
                 String currentTime = "[" + LOG_PREFIX.format(new Date()) + "] ";
 
-                for (String plainMsgPart : plainMsg) {
+                for (String line : lines) {
                     // nobody will know
-                    plainMsgPart = plainMsgPart.replace("```", "´´´");
+                    line = line.replace("```", "´´´");
                     synchronized (feedback) {
-                        feedback.add(currentTime + plainMsgPart);
+                        feedback.add(currentTime + line);
                     }
                 }
 
@@ -80,10 +89,11 @@ public final class ExecuteCommand extends AbstractBotCommand {
                         }
                         updating.set(false);
 
-                        event.editReply("```\n" + content + "\n```").block();
+                        event.editReply("```ansi\n" + content + "\n```").block();
                     }, 20);
                 }
-            }), command);
+            });
+            Bukkit.dispatchCommand(sender[0], command);
         });
         return Mono.empty();
     }
