@@ -16,16 +16,21 @@ import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.Permission;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 
 public final class WhitelistCommand extends AbstractBotCommand {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger("CloudBot");
 
     private final ReentrantLock listLock = new ReentrantLock();
 
@@ -80,16 +85,18 @@ public final class WhitelistCommand extends AbstractBotCommand {
 
                             String name = null;
                             try {
-                                name = McApiUtil.loadProfile(playerId).getUsername();
+                                String loadedName = McApiUtil.loadProfile(playerId).getUsername();
+                                if (loadedName != null && !loadedName.isBlank()) {
+                                    name = loadedName;
+                                } else {
+                                    LOGGER.error("Received blank name while loading profile for {}", playerId);
+                                }
                             } catch (IllegalStateException | IllegalArgumentException exception) {
-                                exception.printStackTrace();
+                                LOGGER.error("Error caused while loading username for {}", playerId, exception);
                             }
 
-                            if (name == null) {
-                                name = playerId.toString().substring(0, 8);
-                            }
-
-                            builder.append(MarkdownEscape.escape(name));
+                            builder.append(MarkdownEscape.escape(
+                                    Objects.requireNonNullElseGet(name, () -> playerId.toString().substring(0, 8))));
                         }
 
                         if (builder.length() > 4096) {
@@ -97,7 +104,7 @@ public final class WhitelistCommand extends AbstractBotCommand {
                             builder.delete(4096 - tooManyStr.length(), builder.length()).append(tooManyStr);
                         }
                     } catch (Throwable throwable) {
-                        throwable.printStackTrace();
+                        LOGGER.error("Error while listing whitelisted players", throwable);
                         builder.append(i18n.apply("command.whitelist.list.error",
                                 "`" + MarkdownEscape.codeEscape(throwable.toString()) + "`"));
                     }
@@ -154,7 +161,7 @@ public final class WhitelistCommand extends AbstractBotCommand {
                     .timestamp(Instant.now())
                     .build());
         } catch (Throwable throwable) {
-            throwable.printStackTrace();
+            LOGGER.error("Error while adding user '{}' to whitelist", username, throwable);
             return event.reply(i18n.apply("command.whitelist.add.error.general",
                     MarkdownEscape.codeEscape(throwable.toString())));
         }
