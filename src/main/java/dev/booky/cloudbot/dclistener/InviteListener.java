@@ -66,9 +66,14 @@ public final class InviteListener implements DcListener {
             return Mono.empty();
         }
 
-        // this works, don't judge it
-        return event.getClient().getRestClient().getInviteService()
-                .getInvite(event.getCode())
+        // I probably can't read or discord just doesn't provide
+        // a route for getting an invite object (with metadata)
+        // by code in a guild...
+        return event.getClient().getRestClient()
+                .getChannelById(event.getChannelId())
+                .getInvites()
+                .filter(data -> data.code().equals(event.getCode()))
+                .elementAt(0)
                 .map(data -> new ExtendedInvite(event.getClient(), data))
                 .doOnSuccess(invite -> {
                     if (invite == null) {
