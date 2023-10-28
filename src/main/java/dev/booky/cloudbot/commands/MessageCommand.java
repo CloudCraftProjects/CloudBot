@@ -212,7 +212,8 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
         }
 
         TextInput imageInput = TextInput.small(EE_IMAGE_ID,
-                i18n.apply("command.message.embed.image"));
+                i18n.apply("command.message.embed.image"))
+                .required(false);
         if (embed.getImage().isPresent()) {
             String imageUrl = embed.getImage().map(Embed.Image::getUrl).orElseThrow();
             imageInput = imageInput.prefilled(imageUrl);
