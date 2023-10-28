@@ -64,6 +64,7 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
     private static final String EE_TITLE_ID = "title";
     private static final String EE_DESCRIPTION_ID = "description";
     private static final String EE_COLOR_ID = "color";
+    private static final String EE_IMAGE_ID = "image";
 
     private static final String CHANNEL_ID = "channel";
     private static final String MESSAGE_ID = "message";
@@ -210,6 +211,13 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
             contentInput = contentInput.prefilled(embed.getDescription().get());
         }
 
+        TextInput imageInput = TextInput.small(EE_IMAGE_ID,
+                i18n.apply("command.message.embed.image"));
+        if (embed.getImage().isPresent()) {
+            String imageUrl = embed.getImage().map(Embed.Image::getUrl).orElseThrow();
+            imageInput = imageInput.prefilled(imageUrl);
+        }
+
         TextInput colorInput = TextInput.small(EE_COLOR_ID,
                         i18n.apply("command.message.embed.color"),
                         1 + 3, 1 + 6)
@@ -230,6 +238,7 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                         .prefilled(message.getContent())))
                 .addComponent(ActionRow.of(titleInput))
                 .addComponent(ActionRow.of(contentInput))
+                .addComponent(ActionRow.of(imageInput))
                 .addComponent(ActionRow.of(colorInput))
                 .build();
     }
@@ -360,6 +369,8 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                             .ifPresent(embed::title);
                     inputs.getOrDefault(EE_DESCRIPTION_ID, Optional.empty())
                             .ifPresent(embed::description);
+                    inputs.getOrDefault(EE_IMAGE_ID, Optional.empty())
+                            .ifPresent(embed::image);
                     inputs.getOrDefault(EE_COLOR_ID, Optional.empty())
                             .flatMap(colorStr -> Optional.ofNullable(TextColor.fromCSSHexString(colorStr)))
                             .map(color -> Color.of(color.value()))
