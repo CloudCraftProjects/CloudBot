@@ -17,6 +17,7 @@ import discord4j.core.object.entity.User;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
+import discord4j.discordjson.possible.Possible;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.Permission;
 import discord4j.rest.util.PermissionSet;
@@ -29,6 +30,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.stream.Collectors;
 
 import static discord4j.rest.util.Image.Format.GIF;
@@ -81,13 +83,12 @@ public final class UserInfoCommand extends AbstractBotCommand {
     @Override
     public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
         if (event.getOption("discord").isPresent()) {
-            User target = event.getOption("discord")
+            Optional<User> target = event.getOption("discord")
                     .flatMap(option -> option.getOption("user"))
                     .flatMap(ApplicationCommandInteractionOption::getValue)
                     .map(ApplicationCommandInteractionOptionValue::asUser)
-                    .flatMap(Mono::blockOptional)
-                    .orElseThrow();
-            return showDiscordInfo(event, user, target);
+                    .flatMap(Mono::blockOptional);
+            return this.showDiscordInfo(event, user, OptionalLong.empty(), target);
         }
 
         McProfile target = event.getOption("minecraft")
@@ -96,7 +97,7 @@ public final class UserInfoCommand extends AbstractBotCommand {
                 .map(ApplicationCommandInteractionOptionValue::asString)
                 .map(McApiUtil::loadProfile)
                 .orElseThrow();
-        return showMinecraftInfo(event, user, target);
+        return this.showMinecraftInfo(event, user, target);
     }
 
     private Mono<Void> showMinecraftInfo(ChatInputInteractionEvent event, User user, McProfile targetProfile) {
@@ -105,39 +106,47 @@ public final class UserInfoCommand extends AbstractBotCommand {
             throw new IllegalStateException("User '" + targetProfile.getUsername() + "' is not on whitelist");
         }
 
-        User target = event.getClient().getUserById(Snowflake.of(targetId)).block();
-        if (target == null) {
-            throw new IllegalStateException("User '" + targetId + "' can't be found");
-        }
-
-        return showDiscordInfo(event, user, target);
+        Optional<User> target = event.getClient().getUserById(Snowflake.of(targetId)).blockOptional();
+        return this.showDiscordInfo(event, user, OptionalLong.of(targetId), target);
     }
 
-    private Mono<Void> showDiscordInfo(ChatInputInteractionEvent event, User user, User target) {
-        Optional<Member> optMember = target.asMember(event.getInteraction().getGuildId().orElseThrow()).blockOptional();
-        Optional<String> guildAvatar = optMember.flatMap(member -> member.getGuildAvatarUrl(member.hasAnimatedGuildAvatar() ? GIF : PNG));
-        Optional<String> nickname = optMember.flatMap(Member::getNickname).map(MarkdownEscape::codeEscape);
-        Optional<Long> joinTime = optMember.flatMap(Member::getJoinTime).map(Instant::getEpochSecond);
-        long createTime = target.getId().getTimestamp().getEpochSecond();
+    private Mono<Void> showDiscordInfo(ChatInputInteractionEvent event, User user,
+                                       OptionalLong inputTargetId, Optional<User> optTarget) {
+        OptionalLong targetId = optTarget.map(target -> OptionalLong.of(target.getId().asLong())).orElse(inputTargetId);
+        if (targetId.isEmpty()) {
+            throw new IllegalArgumentException("Can't show discord info for non-existing target");
+        }
 
         List<McProfile> profiles = this.manager.getStorage().getWhitelist().entrySet().stream()
-                .filter(entry -> entry.getValue() == target.getId().asLong())
+                .filter(entry -> entry.getValue() == targetId.getAsLong())
                 .map(Map.Entry::getKey).map(McApiUtil::loadProfile)
                 .toList();
 
-        StringBuilder description = new StringBuilder("> **Discord Info**\n" +
-                (target.getGlobalName().map(name -> "Displayname: `" + MarkdownEscape.codeEscape(name) + "`\n").orElse("")) +
-                "Username: `" + MarkdownEscape.codeEscape(target.getTag()) + "`\n" +
-                (nickname.map(name -> "Nickname: `" + name + "`\n").orElse("")) +
-                "Id: `" + target.getId().asString() + "`\n" +
-                "Mention: " + target.getMention() + "\n" +
-                "User-Avatar: " + target.getAvatarUrl() + "\n" +
-                "Default-Avatar: " + target.getDefaultAvatarUrl() + "\n" +
-                (guildAvatar.map(value -> "Guild-Avatar: " + value + "\n").orElse("")) +
-                (target.getBannerUrl().isPresent() ? "Banner: " + target.getBannerUrl().orElseThrow() + "\n" : "") +
-                "Created: <t:" + createTime + ":f> (<t:" + createTime + ":R>)\n" +
-                (joinTime.map(time -> "Joined: <t:" + time + ":f> (<t:" + time + ":R>)\n").orElse("")) +
-                "Flags: " + target.getPublicFlags().stream().map(flag -> "`" + flag.name() + "`").collect(Collectors.joining(", ")));
+        StringBuilder description = new StringBuilder();
+
+        if (optTarget.isPresent()) {
+            User target = optTarget.get();
+            Optional<Member> optMember = target.asMember(event.getInteraction().getGuildId().orElseThrow())
+                    .onErrorResume(error -> Mono.empty()).blockOptional();
+            Optional<String> guildAvatar = optMember.flatMap(member -> member.getGuildAvatarUrl(member.hasAnimatedGuildAvatar() ? GIF : PNG));
+            Optional<String> nickname = optMember.flatMap(Member::getNickname).map(MarkdownEscape::codeEscape);
+            Optional<Long> joinTime = optMember.flatMap(Member::getJoinTime).map(Instant::getEpochSecond);
+            long createTime = target.getId().getTimestamp().getEpochSecond();
+
+            description.append("> **Discord Info**\n")
+                    .append(target.getGlobalName().map(name -> "Displayname: `" + MarkdownEscape.codeEscape(name) + "`\n").orElse(""))
+                    .append("Username: `").append(MarkdownEscape.codeEscape(target.getTag())).append("`\n")
+                    .append(nickname.map(name -> "Nickname: `" + name + "`\n").orElse(""))
+                    .append("Id: `").append(target.getId().asString()).append("`\n")
+                    .append("Mention: ").append(target.getMention()).append("\n")
+                    .append("User-Avatar: ").append(target.getAvatarUrl()).append("\n")
+                    .append("Default-Avatar: ").append(target.getDefaultAvatarUrl()).append("\n")
+                    .append(guildAvatar.map(value -> "Guild-Avatar: " + value + "\n").orElse(""))
+                    .append(target.getBannerUrl().isPresent() ? "Banner: " + target.getBannerUrl().orElseThrow() + "\n" : "")
+                    .append("Created: <t:").append(createTime).append(":f> (<t:").append(createTime).append(":R>)\n")
+                    .append(joinTime.map(time -> "Joined: <t:" + time + ":f> (<t:" + time + ":R>)\n").orElse(""))
+                    .append("Flags: ").append(target.getPublicFlags().stream().map(flag -> "`" + flag.name() + "`").collect(Collectors.joining(", ")));
+        }
 
         if (!profiles.isEmpty()) {
             BanList<PlayerProfile> banlist = Bukkit.getBanList(BanList.Type.PROFILE);
@@ -195,7 +204,7 @@ public final class UserInfoCommand extends AbstractBotCommand {
                 .withEmbeds(EmbedCreateSpec.builder()
                         .description(description.toString())
                         .color(Color.DISCORD_BLACK)
-                        .thumbnail(target.getAvatarUrl())
+                        .thumbnail(optTarget.map(User::getAvatarUrl).map(Possible::of).orElseGet(Possible::absent))
                         .footer(user.getTag(), user.getAvatarUrl())
                         .timestamp(Instant.now())
                         .build());
