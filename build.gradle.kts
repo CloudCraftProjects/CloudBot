@@ -104,4 +104,10 @@ tasks {
         options.encoding = Charsets.UTF_8.name()
         options.compilerArgs.add("-Xlint:deprecation")
     }
+
+    withType<Jar> {
+        manifest.attributes(
+            "paperweight-mappings-namespace" to "mojang"
+        )
+    }
 }
