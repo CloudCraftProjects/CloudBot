@@ -224,7 +224,7 @@ public class CloudBotConfig {
         public Mono<Void> run(ChatInputInteractionEvent event) {
             CommandResponse response = this.response;
             if (this.l10nResponse != null && !this.l10nResponse.isEmpty()) {
-                Locale locale = new Locale(event.getInteraction().getUserLocale());
+                Locale locale = Locale.forLanguageTag(event.getInteraction().getUserLocale());
                 CommandResponse l10nResponse = this.l10nResponse.get(locale.getLanguage());
                 if (l10nResponse != null) {
                     response = l10nResponse;
@@ -269,7 +269,7 @@ public class CloudBotConfig {
         @Override
         public int hashCode() {
             int result = this.emoji != null ? this.emoji.hashCode() : 0;
-            result = 31 * result + (int) (this.roleId ^ (this.roleId >>> 32));
+            result = 31 * result + Long.hashCode(this.roleId);
             return result;
         }
     }
@@ -375,3 +375,4 @@ public class CloudBotConfig {
         return this.reactionRoles;
     }
 }
+

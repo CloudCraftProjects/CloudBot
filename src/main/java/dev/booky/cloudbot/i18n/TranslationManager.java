@@ -30,7 +30,7 @@ public final class TranslationManager {
             lang = lang.substring(0, splitIndex);
         }
 
-        Locale locale = new Locale(lang);
+        Locale locale = Locale.forLanguageTag(lang);
         return this.translate(key, locale, args);
     }
 

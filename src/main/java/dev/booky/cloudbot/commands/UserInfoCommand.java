@@ -21,6 +21,7 @@ import discord4j.discordjson.possible.Possible;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.Permission;
 import discord4j.rest.util.PermissionSet;
+import io.papermc.paper.ban.BanListType;
 import org.bukkit.BanEntry;
 import org.bukkit.BanList;
 import org.bukkit.Bukkit;
@@ -149,7 +150,7 @@ public final class UserInfoCommand extends AbstractBotCommand {
         }
 
         if (!profiles.isEmpty()) {
-            BanList<PlayerProfile> banlist = Bukkit.getBanList(BanList.Type.PROFILE);
+            BanList<PlayerProfile> banlist = Bukkit.getBanList(BanListType.PROFILE);
             description.append("\n\n");
 
             for (McProfile profile : profiles) {

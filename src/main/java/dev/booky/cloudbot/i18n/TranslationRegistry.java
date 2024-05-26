@@ -85,7 +85,7 @@ public class TranslationRegistry {
             }
 
             // try without country
-            format = this.formats.get(new Locale(locale.getLanguage()));
+            format = this.formats.get(Locale.forLanguageTag(locale.getLanguage()));
             if (format != null) {
                 return format;
             }

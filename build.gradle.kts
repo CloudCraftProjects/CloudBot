@@ -6,27 +6,25 @@ plugins {
     id("maven-publish")
 
     alias(libs.plugins.pluginyml.paper)
-    alias(libs.plugins.runpaper)
+    alias(libs.plugins.runtask.paper)
     alias(libs.plugins.shadow)
 }
 
 group = "dev.booky"
-version = "1.0.1-SNAPSHOT"
+version = "1.0.2-SNAPSHOT"
+
+val plugin: Configuration by configurations.creating {
+    isTransitive = false
+}
 
 repositories {
-    maven("https://oss.sonatype.org/content/repositories/snapshots/") {
-        content {
-            includeGroup("com.discord4j")
-        }
-    }
-    maven("https://repo.papermc.io/repository/maven-public/")
+    maven("https://repo.cloudcraftmc.de/public/")
 }
 
 dependencies {
-    compileOnly(libs.paperapi)
+    compileOnly(libs.paper.api)
 
-    // already included as server, not exposed in api
-    compileOnlyApi(libs.configurate.yaml)
+    compileOnlyApi(libs.cloudcore)
 
     // downloaded at runtime using library loader
     sequenceOf(
@@ -42,12 +40,14 @@ dependencies {
 
     // integrated metrics
     implementation(libs.bstats)
+
+    plugin(variantOf(libs.cloudcore) { classifier("all") })
 }
 
 java {
     withSourcesJar()
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(21))
         vendor.set(JvmVendorSpec.ADOPTIUM)
     }
 }
@@ -57,8 +57,8 @@ publishing {
         artifactId = project.name.lowercase()
         from(components["java"])
     }
-    repositories.maven("https://maven.pkg.github.com/CloudCraftProjects/CloudBot/") {
-        name = "github"
+    repositories.maven("https://repo.cloudcraftmc.de/private/") {
+        name = "horreo"
         credentials(PasswordCredentials::class.java)
     }
 }
@@ -71,11 +71,14 @@ paper {
     main = "$group.cloudbot.CloudBotMain"
     loader = "$group.cloudbot.CloudBotLoader"
 
-    apiVersion = "1.20"
+    apiVersion = "1.20.5"
     authors = listOf("booky10")
     load = BukkitPluginDescription.PluginLoadOrder.POSTWORLD
 
     serverDependencies {
+        register("CloudCore") {
+            load = PaperPluginDescription.RelativeLoadOrder.BEFORE
+        }
         register("spark") {
             load = PaperPluginDescription.RelativeLoadOrder.BEFORE
             required = false
@@ -86,6 +89,7 @@ paper {
 tasks {
     runServer {
         minecraftVersion(libs.versions.minecraft.get())
+        pluginJars.from(plugin.resolve())
     }
 
     shadowJar {
@@ -97,6 +101,7 @@ tasks {
     }
 
     withType<JavaCompile> {
+        options.encoding = Charsets.UTF_8.name()
         options.compilerArgs.add("-Xlint:deprecation")
     }
 }

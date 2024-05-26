@@ -81,8 +81,8 @@ public final class MessageRef {
 
     @Override
     public int hashCode() {
-        int result = (int) (channelId ^ (channelId >>> 32));
-        result = 31 * result + (int) (messageId ^ (messageId >>> 32));
+        int result = Long.hashCode(channelId);
+        result = 31 * result + Long.hashCode(messageId);
         return result;
     }
 

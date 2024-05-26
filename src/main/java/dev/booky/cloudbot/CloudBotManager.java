@@ -14,8 +14,10 @@ import dev.booky.cloudbot.i18n.TranslationManager;
 import dev.booky.cloudbot.i18n.Translator;
 import dev.booky.cloudbot.storage.CloudBotConfig;
 import dev.booky.cloudbot.storage.CloudBotStorage;
-import dev.booky.cloudbot.storage.ConfigLoader;
-import dev.booky.cloudbot.storage.ConfigLoader.FileType;
+import dev.booky.cloudbot.storage.ColorSerializer;
+import dev.booky.cloudbot.storage.MessageRef;
+import dev.booky.cloudbot.storage.MessageRefSerializer;
+import dev.booky.cloudcore.config.ConfigurateLoader;
 import discord4j.common.util.Snowflake;
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
@@ -29,6 +31,7 @@ import discord4j.gateway.ShardInfo;
 import discord4j.gateway.intent.Intent;
 import discord4j.gateway.intent.IntentSet;
 import discord4j.rest.util.AllowedMentions;
+import discord4j.rest.util.Color;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -36,6 +39,8 @@ import org.bukkit.plugin.Plugin;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.spongepowered.configurate.gson.GsonConfigurationLoader;
+import org.spongepowered.configurate.serialize.TypeSerializerCollection;
 import reactor.core.publisher.Mono;
 
 import java.nio.file.Path;
@@ -59,6 +64,15 @@ public final class CloudBotManager implements DcListener {
             .append(Component.text('t', TextColor.color(0x98e1ce)))
             .append(Component.text(']', NamedTextColor.GRAY))
             .append(Component.space()).build();
+
+    private static final TypeSerializerCollection SERIALIZERS = TypeSerializerCollection.builder()
+            .register(Color.class, ColorSerializer.INSTANCE)
+            .register(MessageRef.class, MessageRefSerializer.INSTANCE)
+            .build();
+    private static final ConfigurateLoader<?, ?> GSON_LOADER = ConfigurateLoader.loader(GsonConfigurationLoader::builder)
+            .withAllDefaultSerializers().withSerializers(SERIALIZERS).build();
+    private static final ConfigurateLoader<?, ?> YAML_LOADER = ConfigurateLoader.yamlLoader()
+            .withAllDefaultSerializers().withSerializers(SERIALIZERS).build();
 
     private final TranslationManager i18n;
     private final Plugin plugin;
@@ -117,8 +131,8 @@ public final class CloudBotManager implements DcListener {
     public Mono<Void> reloadStorages(@Nullable GatewayDiscordClient gateway, @Nullable ShardInfo shardInfo) {
         return Mono.defer(() -> {
             synchronized (this.diskLock) {
-                this.config = ConfigLoader.loadObject(this.configPath, CloudBotConfig.class, FileType.YAML);
-                this.storage = ConfigLoader.loadObject(this.storagePath, CloudBotStorage.class, FileType.JSON);
+                this.config = YAML_LOADER.loadObject(this.configPath, CloudBotConfig.class);
+                this.storage = GSON_LOADER.loadObject(this.storagePath, CloudBotStorage.class);
                 this.i18n.reload();
             }
 
@@ -132,10 +146,10 @@ public final class CloudBotManager implements DcListener {
     public void saveStorages() {
         synchronized (this.diskLock) {
             if (this.dirtyConfig) {
-                ConfigLoader.saveObject(this.configPath, this.getConfig(), FileType.YAML);
+                YAML_LOADER.saveObject(this.configPath, this.getConfig(), CloudBotConfig.class);
             }
             if (this.dirtyStorage) {
-                ConfigLoader.saveObject(this.storagePath, this.getStorage(), FileType.JSON);
+                GSON_LOADER.saveObject(this.storagePath, this.getStorage(), CloudBotStorage.class);
             }
         }
     }
