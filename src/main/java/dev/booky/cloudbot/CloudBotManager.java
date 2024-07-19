@@ -17,6 +17,7 @@ import dev.booky.cloudbot.storage.CloudBotStorage;
 import dev.booky.cloudbot.storage.ColorSerializer;
 import dev.booky.cloudbot.storage.MessageRef;
 import dev.booky.cloudbot.storage.MessageRefSerializer;
+import dev.booky.cloudbot.util.ApplicationIdUtil;
 import dev.booky.cloudcore.config.ConfigurateLoader;
 import discord4j.common.util.Snowflake;
 import discord4j.core.DiscordClientBuilder;
@@ -186,6 +187,7 @@ public final class CloudBotManager implements DcListener {
                 .setInitialPresence(info -> this.getConfig().buildPresence(info))
                 .withGateway(gateway -> {
                     this.gateway = gateway;
+                    ApplicationIdUtil.replaceApplicationIdMono(gateway);
                     return this.registerEvents(gateway).then()
                             // no one will notice...
                             .and(this.reloadMainGuildData(gateway, null))

@@ -93,7 +93,7 @@ public final class CommandListener implements DcListener {
 
     @DcEventHandler
     public Mono<Void> onDataReload(MainGuildDataReloadEvent event) {
-        return ApplicationIdUtil.requestApplicationId(event.getClient())
+        return event.getClient().getRestClient().getApplicationId()
                 // reload global commands
                 .flatMap(appId -> this.reloadGlobalCommands(appId, event.getClient()).then()
                         .then().and(event.getMainGuild()
