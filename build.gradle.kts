@@ -71,7 +71,7 @@ paper {
     main = "$group.cloudbot.CloudBotMain"
     loader = "$group.cloudbot.CloudBotLoader"
 
-    apiVersion = "1.20.5"
+    apiVersion = "1.20"
     authors = listOf("booky10")
     load = BukkitPluginDescription.PluginLoadOrder.POSTWORLD
 
