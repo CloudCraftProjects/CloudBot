@@ -19,6 +19,7 @@ import dev.booky.cloudbot.events.DcListener;
 import dev.booky.cloudbot.events.custom.MainGuildDataReloadEvent;
 import dev.booky.cloudbot.i18n.Translator;
 import dev.booky.cloudbot.storage.CloudBotConfig;
+import dev.booky.cloudbot.util.ApplicationIdUtil;
 import dev.booky.cloudbot.util.CommandStringifier;
 import dev.booky.cloudbot.util.MarkdownEscape;
 import discord4j.common.util.Snowflake;
@@ -92,7 +93,7 @@ public final class CommandListener implements DcListener {
 
     @DcEventHandler
     public Mono<Void> onDataReload(MainGuildDataReloadEvent event) {
-        return event.getClient().getRestClient().getApplicationId()
+        return ApplicationIdUtil.requestApplicationId(event.getClient())
                 // reload global commands
                 .flatMap(appId -> this.reloadGlobalCommands(appId, event.getClient()).then()
                         .then().and(event.getMainGuild()
