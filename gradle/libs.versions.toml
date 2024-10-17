@@ -1,14 +1,14 @@
 [versions]
 pluginyml = "0.6.0"
-runtask = "2.3.0"
-shadow = "8.1.7"
+runtask = "2.3.1"
+shadow = "8.3.3"
 
-minecraft = "1.20.6"
-paperapi = "1.20.6-R0.1-SNAPSHOT"
+minecraft = "1.21.1"
+paperapi = "1.21.1-R0.1-SNAPSHOT"
 
 cloudcore = "1.1.0-SNAPSHOT"
 configurate = "4.1.2"
-bstats = "3.0.2"
+bstats = "3.1.0"
 
 discord4j = "3.3.0-RC1"
 spark-api = "0.1-SNAPSHOT"
@@ -16,7 +16,7 @@ spark-api = "0.1-SNAPSHOT"
 [plugins]
 pluginyml-paper = { id = "net.minecrell.plugin-yml.paper", version.ref = "pluginyml" }
 runtask-paper = { id = "xyz.jpenilla.run-paper", version.ref = "runtask" }
-shadow = { id = "io.github.goooler.shadow", version.ref = "shadow" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 
 [libraries]
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paperapi" }

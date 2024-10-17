@@ -47,8 +47,8 @@ dependencies {
 java {
     withSourcesJar()
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
-        vendor.set(JvmVendorSpec.ADOPTIUM)
+        languageVersion = JavaLanguageVersion.of(21)
+        vendor = JvmVendorSpec.ADOPTIUM
     }
 }
 
@@ -103,6 +103,7 @@ tasks {
     withType<JavaCompile> {
         options.encoding = Charsets.UTF_8.name()
         options.compilerArgs.add("-Xlint:deprecation")
+        options.compilerArgs.add("-Xlint:unchecked")
     }
 
     withType<Jar> {
