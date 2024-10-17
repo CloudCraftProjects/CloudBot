@@ -8,35 +8,39 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
-import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 public class McApiUtil {
 
+    public static final HttpClient HTTP = HttpClient.newHttpClient();
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
     private static final Pattern USERNAME_PATTERN = Pattern.compile("[a-zA-Z0-9_]{1,16}");
 
     private static final URI NAME_URI = URI.create("https://api.mojang.com/users/profiles/minecraft/");
     private static final URI UUID_URI = URI.create("https://sessionserver.mojang.com/session/minecraft/profile/");
 
-    private static final LoadingCache<String, McProfile> NAME_PROFILE_CACHE = Caffeine.newBuilder()
+    private static final LoadingCache<String, Optional<McProfile>> NAME_PROFILE_CACHE = Caffeine.newBuilder()
             .expireAfterWrite(1, TimeUnit.DAYS)
             .build(McApiUtil::loadProfile0);
-    private static final LoadingCache<UUID, McProfile> UUID_PROFILE_CACHE = Caffeine.newBuilder()
+    private static final LoadingCache<UUID, Optional<McProfile>> UUID_PROFILE_CACHE = Caffeine.newBuilder()
             .expireAfterWrite(1, TimeUnit.DAYS)
             .build(McApiUtil::loadProfile0);
 
-    public static McProfile loadProfile(UUID uniqueId) {
+    public static Optional<McProfile> loadProfile(UUID uniqueId) {
         return UUID_PROFILE_CACHE.get(uniqueId);
     }
 
-    public static McProfile loadProfile(String username) {
+    public static Optional<McProfile> loadProfile(String username) {
         if (!USERNAME_PATTERN.matcher(username).matches()) {
             throw new IllegalArgumentException("Illegal minecraft username '" + username + "'");
         }
@@ -44,30 +48,36 @@ public class McApiUtil {
         return NAME_PROFILE_CACHE.get(username.toLowerCase(Locale.ROOT));
     }
 
-    private static McProfile loadProfile0(UUID uniqueId) {
-        String response = HttpUtil.getJoin(UUID_URI.resolve(uniqueId.toString()), HttpResponse.BodyHandlers.ofString());
-        if (response.isEmpty()) { // Player does not exist
-            throw new IllegalArgumentException("Player '" + uniqueId + "' does not exist");
+    private static Optional<McProfile> loadProfile0(UUID uniqueId) {
+        HttpRequest req = HttpRequest.newBuilder(UUID_URI.resolve(uniqueId.toString())).build();
+        HttpResponse<String> resp = HTTP.sendAsync(req, BodyHandlers.ofString()).join();
+        if (resp.statusCode() == 204) {
+            return Optional.empty(); // unknown player
+        } else if (resp.statusCode() != 200) {
+            throw new IllegalStateException("Server returned unexpected response:\n" + resp);
         }
 
-        JsonObject jsonResp = GSON.fromJson(response, JsonObject.class);
+        JsonObject jsonResp = GSON.fromJson(resp.body(), JsonObject.class);
         if (!jsonResp.has("name")) {
             throw new IllegalStateException("Server returned unknown response:\n" + jsonResp);
         }
 
         String username = jsonResp.get("name").getAsString();
-        McProfile profile = new McProfile(username, uniqueId);
+        Optional<McProfile> profile = Optional.of(new McProfile(username, uniqueId));
         NAME_PROFILE_CACHE.put(username, profile);
         return profile;
     }
 
-    private static McProfile loadProfile0(String username) {
-        String response = HttpUtil.getJoin(NAME_URI.resolve(username), HttpResponse.BodyHandlers.ofString());
-        if (response.isEmpty()) { // Player does not exist
-            throw new IllegalArgumentException("Player '" + username + "' does not exist");
+    private static Optional<McProfile> loadProfile0(String username) {
+        HttpRequest req = HttpRequest.newBuilder(NAME_URI.resolve(username)).build();
+        HttpResponse<String> resp = HTTP.sendAsync(req, BodyHandlers.ofString()).join();
+        if (resp.statusCode() == 404) {
+            return Optional.empty(); // unknown player
+        } else if (resp.statusCode() != 200) {
+            throw new IllegalStateException("Server returned unexpected response:\n" + resp);
         }
 
-        JsonObject jsonResp = GSON.fromJson(response, JsonObject.class);
+        JsonObject jsonResp = GSON.fromJson(resp.body(), JsonObject.class);
         if (!jsonResp.has("id") || !jsonResp.has("name")) {
             throw new IllegalStateException("Server returned unknown response:\n" + jsonResp);
         }
@@ -75,7 +85,7 @@ public class McApiUtil {
         UUID uniqueId = FastUuidSansHyphens.parseUuid(jsonResp.get("id").getAsString());
         String realUsername = jsonResp.get("name").getAsString();
 
-        McProfile profile = new McProfile(realUsername, uniqueId);
+        Optional<McProfile> profile = Optional.of(new McProfile(realUsername, uniqueId));
         UUID_PROFILE_CACHE.put(uniqueId, profile);
         return profile;
     }

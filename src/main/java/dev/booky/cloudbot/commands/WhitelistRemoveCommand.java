@@ -88,7 +88,13 @@ public final class WhitelistRemoveCommand extends AbstractBotCommand {
                 .map(ApplicationCommandInteractionOptionValue::asString)
                 .orElseThrow();
 
-        McApiUtil.McProfile profile = McApiUtil.loadProfile(username);
+        Optional<McApiUtil.McProfile> optProfile = McApiUtil.loadProfile(username);
+        if (optProfile.isEmpty()) {
+            return event.reply(i18n.apply("command.whitelist.add.error.unknown-user",
+                    "`" + MarkdownEscape.codeEscape(username) + "`"));
+        }
+
+        McApiUtil.McProfile profile = optProfile.get();
         if (!this.manager.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
             return event.reply(i18n.apply("command.whitelist-remove.not-whitelisted",
                     "`" + MarkdownEscape.codeEscape(profile.getUsername()) + "`")).withEphemeral(true);

@@ -98,11 +98,9 @@ public final class WhitelistCommand extends AbstractBotCommand {
 
                         String name = null;
                         try {
-                            String loadedName = McApiUtil.loadProfile(playerId).getUsername();
-                            if (loadedName != null && !loadedName.isBlank()) {
-                                name = loadedName;
-                            } else {
-                                LOGGER.error("Received blank name while loading profile for {}", playerId);
+                            Optional<McApiUtil.McProfile> profile = McApiUtil.loadProfile(playerId);
+                            if (profile.isPresent()) {
+                                name = profile.get().getUsername();
                             }
                         } catch (IllegalStateException | IllegalArgumentException exception) {
                             LOGGER.error("Error caused while loading username for {}", playerId, exception);
@@ -165,7 +163,13 @@ public final class WhitelistCommand extends AbstractBotCommand {
                 .orElseThrow();
 
         try {
-            McApiUtil.McProfile profile = McApiUtil.loadProfile(username);
+            Optional<McApiUtil.McProfile> optProfile = McApiUtil.loadProfile(username);
+            if (optProfile.isEmpty()) {
+                return event.reply(i18n.apply("command.whitelist.add.error.unknown-user",
+                        "`" + MarkdownEscape.codeEscape(username) + "`"));
+            }
+
+            McApiUtil.McProfile profile = optProfile.get();
             if (this.manager.getStorage().getWhitelist().containsKey(profile.getUniqueId())) {
                 return event.reply(i18n.apply("command.whitelist.add.error.mc-already-whitelisted",
                         "`" + MarkdownEscape.codeEscape(profile.getUsername()) + "`"));

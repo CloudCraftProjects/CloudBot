@@ -96,7 +96,7 @@ public final class UserInfoCommand extends AbstractBotCommand {
                 .flatMap(option -> option.getOption("username"))
                 .flatMap(ApplicationCommandInteractionOption::getValue)
                 .map(ApplicationCommandInteractionOptionValue::asString)
-                .map(McApiUtil::loadProfile)
+                .flatMap(McApiUtil::loadProfile)
                 .orElseThrow();
         return this.showMinecraftInfo(event, user, target);
     }
@@ -121,7 +121,7 @@ public final class UserInfoCommand extends AbstractBotCommand {
         List<McProfile> profiles = this.manager.getStorage().getWhitelist().entrySet().stream()
                 .filter(entry -> entry.getValue() == targetId.getAsLong())
                 .map(Map.Entry::getKey).map(McApiUtil::loadProfile)
-                .toList();
+                .flatMap(Optional::stream).toList();
 
         StringBuilder description = new StringBuilder();
 
