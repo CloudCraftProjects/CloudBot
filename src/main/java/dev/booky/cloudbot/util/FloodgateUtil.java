@@ -54,7 +54,7 @@ public final class FloodgateUtil {
         }
 
         public static CompletableFuture<Long> getXuid(String gamertag) {
-            return FloodgateApi.getInstance().getXuidFor(gamertag);
+            return FloodgateApi.getInstance().getXuidFor(gamertag).exceptionally(__ -> null);
         }
 
         public static UUID createJavaUniqueId(long xuid) {
