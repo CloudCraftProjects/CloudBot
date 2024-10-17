@@ -12,6 +12,7 @@ import java.util.UUID;
 public class CloudBotStorage {
 
     private Map<UUID, Long> whitelist = new LinkedHashMap<>();
+    private Map<Long, Long> bedrockWhitelist = new LinkedHashMap<>();
 
     @SuppressWarnings("unused") // configurate
     private CloudBotStorage() {
@@ -19,5 +20,9 @@ public class CloudBotStorage {
 
     public Map<UUID, Long> getWhitelist() {
         return whitelist;
+    }
+
+    public Map<Long, Long> getBedrockWhitelist() {
+        return this.bedrockWhitelist;
     }
 }

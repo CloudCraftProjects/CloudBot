@@ -3,6 +3,7 @@ package dev.booky.cloudbot.commands;
 
 import dev.booky.cloudbot.CloudBotManager;
 import dev.booky.cloudbot.i18n.Translator;
+import dev.booky.cloudbot.util.FloodgateUtil;
 import dev.booky.cloudbot.util.MarkdownEscape;
 import dev.booky.cloudbot.util.McApiUtil;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
@@ -45,7 +46,7 @@ public final class WhitelistCommand extends AbstractBotCommand {
                 .descriptionLocalizationsOrNull(Map.of("de", "Lässt dich auf die Whitelist des Minecraft Servers zugreifen und bearbeiten"))
                 .dmPermission(false)
                 .addOption(ApplicationCommandOptionData.builder()
-                        .name("add")
+                        .name("java")
                         .description("Whitelists you on the minecraft server")
                         .descriptionLocalizationsOrNull(Map.of("de", "Whitelisted dich auf dem Minecraft Server"))
                         .type(ApplicationCommandOption.Type.SUB_COMMAND.getValue())
@@ -55,7 +56,21 @@ public final class WhitelistCommand extends AbstractBotCommand {
                                 .description("Your minecraft ingame name")
                                 .descriptionLocalizationsOrNull(Map.of("de", "Dein Minecraft Ingame-Nutzername"))
                                 .type(ApplicationCommandOption.Type.STRING.getValue())
-                                .minLength(3).maxLength(16)
+                                .minLength(1).maxLength(16)
+                                .required(true)
+                                .build())
+                        .build())
+                .addOption(ApplicationCommandOptionData.builder()
+                        .name("bedrock")
+                        .description("Whitelists you on the minecraft server")
+                        .descriptionLocalizationsOrNull(Map.of("de", "Whitelisted dich auf dem Minecraft Server"))
+                        .type(ApplicationCommandOption.Type.SUB_COMMAND.getValue())
+                        .addOption(ApplicationCommandOptionData.builder()
+                                .name("gamertag")
+                                .description("Your xbox gamertag")
+                                .descriptionLocalizationsOrNull(Map.of("de", "Dein Xbox Gamertag"))
+                                .type(ApplicationCommandOption.Type.STRING.getValue())
+                                .minLength(1).maxLength(16)
                                 .required(true)
                                 .build())
                         .build())
@@ -67,68 +82,84 @@ public final class WhitelistCommand extends AbstractBotCommand {
                         .build());
     }
 
+    private Mono<Void> list(ChatInputInteractionEvent event, Translator i18n) {
+        return event.deferReply().withEphemeral(true).then().and(Mono.defer(() -> {
+            this.listLock.lock();
+
+            try {
+                StringBuilder builder = new StringBuilder();
+                Set<UUID> playerIds = Set.copyOf(this.manager.getStorage().getWhitelist().keySet());
+
+                try {
+                    for (UUID playerId : playerIds) {
+                        if (!builder.isEmpty()) {
+                            builder.append(", ");
+                        }
+
+                        String name = null;
+                        try {
+                            String loadedName = McApiUtil.loadProfile(playerId).getUsername();
+                            if (loadedName != null && !loadedName.isBlank()) {
+                                name = loadedName;
+                            } else {
+                                LOGGER.error("Received blank name while loading profile for {}", playerId);
+                            }
+                        } catch (IllegalStateException | IllegalArgumentException exception) {
+                            LOGGER.error("Error caused while loading username for {}", playerId, exception);
+                        }
+
+                        builder.append(MarkdownEscape.escape(
+                                Objects.requireNonNullElseGet(name,
+                                        () -> playerId.toString().substring(0, 8))));
+                    }
+
+                    if (builder.length() > 4096) {
+                        String tooManyStr = "... \n> **" + i18n.apply("command.whitelist.list.too-many-players", builder.length()) + "**";
+                        builder.delete(4096 - tooManyStr.length(), builder.length()).append(tooManyStr);
+                    }
+                } catch (Throwable throwable) {
+                    LOGGER.error("Error while listing whitelisted players", throwable);
+                    builder.append(i18n.apply("command.whitelist.list.error",
+                            "`" + MarkdownEscape.codeEscape(throwable.toString()) + "`"));
+                }
+
+                return event.createFollowup()
+                        .withEmbeds(EmbedCreateSpec.builder()
+                                .title(i18n.apply("command.whitelist.list.success", playerIds.size()))
+                                .description(builder.toString())
+                                .color(Color.CYAN)
+                                .build())
+                        .then();
+            } finally {
+                this.listLock.unlock();
+            }
+        }));
+    }
+
     @Override
     public Mono<Void> run(ChatInputInteractionEvent event, User user, Translator i18n) {
         if (event.getOption("list").isPresent()) {
-            return event.deferReply().withEphemeral(true).then().and(Mono.defer(() -> {
-                this.listLock.lock();
-
-                try {
-                    StringBuilder builder = new StringBuilder();
-                    Set<UUID> playerIds = Set.copyOf(manager.getStorage().getWhitelist().keySet());
-
-                    try {
-                        for (UUID playerId : playerIds) {
-                            if (!builder.isEmpty()) {
-                                builder.append(", ");
-                            }
-
-                            String name = null;
-                            try {
-                                String loadedName = McApiUtil.loadProfile(playerId).getUsername();
-                                if (loadedName != null && !loadedName.isBlank()) {
-                                    name = loadedName;
-                                } else {
-                                    LOGGER.error("Received blank name while loading profile for {}", playerId);
-                                }
-                            } catch (IllegalStateException | IllegalArgumentException exception) {
-                                LOGGER.error("Error caused while loading username for {}", playerId, exception);
-                            }
-
-                            builder.append(MarkdownEscape.escape(
-                                    Objects.requireNonNullElseGet(name, () -> playerId.toString().substring(0, 8))));
-                        }
-
-                        if (builder.length() > 4096) {
-                            String tooManyStr = "... \n> **" + i18n.apply("command.whitelist.list.too-many-players", builder.length()) + "**";
-                            builder.delete(4096 - tooManyStr.length(), builder.length()).append(tooManyStr);
-                        }
-                    } catch (Throwable throwable) {
-                        LOGGER.error("Error while listing whitelisted players", throwable);
-                        builder.append(i18n.apply("command.whitelist.list.error",
-                                "`" + MarkdownEscape.codeEscape(throwable.toString()) + "`"));
-                    }
-
-                    return event.createFollowup()
-                            .withEmbeds(EmbedCreateSpec.builder()
-                                    .title(i18n.apply("command.whitelist.list.success", playerIds.size()))
-                                    .description(builder.toString())
-                                    .color(Color.CYAN)
-                                    .build())
-                            .then();
-                } finally {
-                    this.listLock.unlock();
-                }
-            }));
+            return this.list(event, i18n);
         }
 
-        Optional<ApplicationCommandInteractionOption> addOption = event.getOption("add");
-        if (addOption.isEmpty()) {
-            throw new IllegalStateException("Neither list, nor add option are supplied");
+        Optional<ApplicationCommandInteractionOption> javaOption = event.getOption("java");
+        if (javaOption.isPresent()) {
+            return this.addJava(event, user, i18n, javaOption.get());
         }
 
-        String username = addOption
-                .flatMap(opt -> opt.getOption("username"))
+        Optional<ApplicationCommandInteractionOption> bedrockOption = event.getOption("bedrock");
+        if (bedrockOption.isPresent()) {
+            return this.addBedrock(event, user, i18n, bedrockOption.get());
+        }
+
+        throw new IllegalStateException("Neither list nor java or bedrock options found");
+    }
+
+    private Mono<Void> addJava(
+            ChatInputInteractionEvent event, User user, Translator i18n,
+            ApplicationCommandInteractionOption option
+    ) {
+        String username = option.getOption("username")
                 .flatMap(ApplicationCommandInteractionOption::getValue)
                 .map(ApplicationCommandInteractionOptionValue::asString)
                 .orElseThrow();
@@ -139,7 +170,8 @@ public final class WhitelistCommand extends AbstractBotCommand {
                 return event.reply(i18n.apply("command.whitelist.add.error.mc-already-whitelisted",
                         "`" + MarkdownEscape.codeEscape(profile.getUsername()) + "`"));
             }
-            if (this.manager.getStorage().getWhitelist().containsValue(user.getId().asLong())) {
+            if (this.manager.getStorage().getBedrockWhitelist().containsValue(user.getId().asLong())
+                    || this.manager.getStorage().getWhitelist().containsValue(user.getId().asLong())) {
                 boolean bypass = event.getInteraction().getGuildId()
                         .map(user::asMember).flatMap(Mono::blockOptional)
                         .map(Member::getBasePermissions).flatMap(Mono::blockOptional)
@@ -162,6 +194,55 @@ public final class WhitelistCommand extends AbstractBotCommand {
                     .build());
         } catch (Throwable throwable) {
             LOGGER.error("Error while adding user '{}' to whitelist", username, throwable);
+            return event.reply(i18n.apply("command.whitelist.add.error.general",
+                    MarkdownEscape.codeEscape(throwable.toString())));
+        }
+    }
+
+    private Mono<Void> addBedrock(
+            ChatInputInteractionEvent event, User user, Translator i18n,
+            ApplicationCommandInteractionOption option
+    ) {
+        String gamertag = option.getOption("gamertag")
+                .flatMap(ApplicationCommandInteractionOption::getValue)
+                .map(ApplicationCommandInteractionOptionValue::asString)
+                .orElseThrow();
+
+        try {
+            Long xuid = FloodgateUtil.getXuid(gamertag).join();
+            if (xuid == null) {
+                return event.reply(i18n.apply("command.whitelist.add.error.unknown-user",
+                        "`" + MarkdownEscape.codeEscape(gamertag) + "`"));
+            }
+
+            if (this.manager.getStorage().getBedrockWhitelist().containsKey(xuid)) {
+                return event.reply(i18n.apply("command.whitelist.add.error.mc-already-whitelisted",
+                        "`" + MarkdownEscape.codeEscape(gamertag) + "`"));
+            }
+            if (this.manager.getStorage().getBedrockWhitelist().containsValue(user.getId().asLong())
+                    || this.manager.getStorage().getWhitelist().containsValue(user.getId().asLong())) {
+                boolean bypass = event.getInteraction().getGuildId()
+                        .map(user::asMember).flatMap(Mono::blockOptional)
+                        .map(Member::getBasePermissions).flatMap(Mono::blockOptional)
+                        .map(set -> set.contains(Permission.MANAGE_MESSAGES))
+                        .orElse(false);
+                if (!bypass) {
+                    return event.reply(i18n.apply("command.whitelist.add.error.dc-already-whitelisted"));
+                }
+            }
+            this.manager.updateStorage(storage -> storage.getBedrockWhitelist().put(xuid, user.getId().asLong()));
+
+            UUID javaXuid = FloodgateUtil.createJavaUniqueId(xuid);
+            return event.reply().withEmbeds(EmbedCreateSpec.builder()
+                    .color(Color.GREEN).title(i18n.apply("command.whitelist.add.success.title"))
+                    .description(i18n.apply("command.whitelist.add.success.description", user.getMention(),
+                            "`" + MarkdownEscape.codeEscape(gamertag) + "`"))
+                    .footer(user.getTag(), user.getAvatarUrl())
+                    .thumbnail("https://api.tydiumcraft.net/v1/players/skin?uuid=" + javaXuid + "&type=avatar&size=128")
+                    .timestamp(Instant.now())
+                    .build());
+        } catch (Throwable throwable) {
+            LOGGER.error("Error while adding user '{}' to whitelist", gamertag, throwable);
             return event.reply(i18n.apply("command.whitelist.add.error.general",
                     MarkdownEscape.codeEscape(throwable.toString())));
         }

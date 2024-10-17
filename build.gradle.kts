@@ -37,6 +37,7 @@ dependencies {
 
     // optional dependency
     compileOnlyApi(libs.spark.api)
+    compileOnly(libs.floodgate.api)
 
     // integrated metrics
     implementation(libs.bstats)
@@ -80,6 +81,10 @@ paper {
             load = PaperPluginDescription.RelativeLoadOrder.BEFORE
         }
         register("spark") {
+            load = PaperPluginDescription.RelativeLoadOrder.BEFORE
+            required = false
+        }
+        register("floodgate") {
             load = PaperPluginDescription.RelativeLoadOrder.BEFORE
             required = false
         }

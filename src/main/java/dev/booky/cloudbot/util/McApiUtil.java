@@ -8,6 +8,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.net.http.HttpResponse;
@@ -19,7 +20,7 @@ import java.util.regex.Pattern;
 public class McApiUtil {
 
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
-    private static final Pattern USERNAME_PATTERN = Pattern.compile("[a-zA-Z0-9_]{3,16}");
+    private static final Pattern USERNAME_PATTERN = Pattern.compile("[a-zA-Z0-9_]{1,16}");
 
     private static final URI NAME_URI = URI.create("https://api.mojang.com/users/profiles/minecraft/");
     private static final URI UUID_URI = URI.create("https://sessionserver.mojang.com/session/minecraft/profile/");

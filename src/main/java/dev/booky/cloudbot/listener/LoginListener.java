@@ -2,6 +2,7 @@ package dev.booky.cloudbot.listener;
 // Created by booky10 in CloudBot (17:39 12.10.22)
 
 import dev.booky.cloudbot.CloudBotManager;
+import dev.booky.cloudbot.util.FloodgateUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.event.EventHandler;
@@ -9,6 +10,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerLoginEvent;
 
+import java.util.OptionalLong;
 import java.util.UUID;
 
 public class LoginListener implements Listener {
@@ -32,6 +34,10 @@ public class LoginListener implements Listener {
         if (this.manager.getStorage().getWhitelist().containsKey(uniqueId)) {
             return;
         }
+        OptionalLong bedrockId = FloodgateUtil.getBedrockId(uniqueId);
+        if (bedrockId.isPresent() && this.manager.getStorage().getBedrockWhitelist().containsKey(bedrockId.getAsLong())) {
+            return;
+        }
         if (event.getPlayer().hasPermission("cloudbot.bypass-whitelist")) {
             return;
         }
@@ -42,6 +48,7 @@ public class LoginListener implements Listener {
             message += "\nYou can join our discord using " + inviteLink + " for whitelisting yourself.";
         }
 
-        event.disallow(PlayerLoginEvent.Result.KICK_WHITELIST, Component.text(message, NamedTextColor.RED));
+        event.disallow(PlayerLoginEvent.Result.KICK_WHITELIST,
+                Component.text(message, NamedTextColor.RED));
     }
 }
