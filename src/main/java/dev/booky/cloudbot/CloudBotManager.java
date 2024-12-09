@@ -31,6 +31,8 @@ import discord4j.core.object.entity.channel.GuildMessageChannel;
 import discord4j.gateway.ShardInfo;
 import discord4j.gateway.intent.Intent;
 import discord4j.gateway.intent.IntentSet;
+import discord4j.rest.request.RouterOptions;
+import discord4j.rest.route.Routes;
 import discord4j.rest.util.AllowedMentions;
 import discord4j.rest.util.Color;
 import net.kyori.adventure.text.Component;
@@ -51,6 +53,8 @@ import java.util.function.Consumer;
 public final class CloudBotManager implements DcListener {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("CloudBot");
+
+    private static final String DISCORD_BASE_URL = System.getProperty("cloudbot.discord-base-url", Routes.BASE_URL);
 
     // <gray>[<gradient:#d4d4d4:#8fe3cd>CloudBot</gradient>]</gray><space>
     private static final Component PREFIX = Component.text()
@@ -180,6 +184,10 @@ public final class CloudBotManager implements DcListener {
 
     public Mono<Void> startBot() {
         return Mono.defer(() -> DiscordClientBuilder.create(this.getConfig().getToken())
+                .setExtraOptions(opts -> new RouterOptions(
+                        opts.getAuthorizationScheme(), opts.getToken(), opts.getReactorResources(),
+                        opts.getExchangeStrategies(), opts.getResponseTransformers(), opts.getGlobalRateLimiter(),
+                        opts.getRequestQueueFactory(), DISCORD_BASE_URL))
                 .setDefaultAllowedMentions(AllowedMentions.suppressAll())
                 .build()
                 .gateway()
