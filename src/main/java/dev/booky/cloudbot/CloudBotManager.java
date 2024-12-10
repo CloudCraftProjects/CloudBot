@@ -19,6 +19,7 @@ import dev.booky.cloudbot.storage.MessageRef;
 import dev.booky.cloudbot.storage.MessageRefSerializer;
 import dev.booky.cloudbot.util.ApplicationIdUtil;
 import dev.booky.cloudcore.config.ConfigurateLoader;
+import discord4j.common.ReactorResources;
 import discord4j.common.util.Snowflake;
 import discord4j.core.DiscordClientBuilder;
 import discord4j.core.GatewayDiscordClient;
@@ -189,6 +190,10 @@ public final class CloudBotManager implements DcListener {
                         opts.getExchangeStrategies(), opts.getResponseTransformers(), opts.getGlobalRateLimiter(),
                         opts.getRequestQueueFactory(), DISCORD_BASE_URL))
                 .setDefaultAllowedMentions(AllowedMentions.suppressAll())
+                .setReactorResources(ReactorResources.builder()
+                        .httpClient(ReactorResources.DEFAULT_HTTP_CLIENT.get()
+                                .proxyWithSystemProperties())
+                        .build())
                 .build()
                 .gateway()
                 .setEnabledIntents(IntentSet.of(Intent.GUILD_MEMBERS, Intent.GUILD_INVITES, Intent.GUILD_MESSAGE_REACTIONS))
