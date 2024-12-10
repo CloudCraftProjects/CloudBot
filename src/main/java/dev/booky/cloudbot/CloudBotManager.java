@@ -26,9 +26,12 @@ import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.Event;
 import discord4j.core.event.domain.guild.GuildCreateEvent;
 import discord4j.core.event.domain.guild.GuildDeleteEvent;
+import discord4j.core.event.domain.lifecycle.ReadyEvent;
 import discord4j.core.object.command.Interaction;
 import discord4j.core.object.entity.Guild;
 import discord4j.core.object.entity.channel.GuildMessageChannel;
+import discord4j.gateway.DefaultGatewayClient;
+import discord4j.gateway.GatewayClient;
 import discord4j.gateway.ShardInfo;
 import discord4j.gateway.intent.Intent;
 import discord4j.gateway.intent.IntentSet;
@@ -47,8 +50,10 @@ import org.spongepowered.configurate.gson.GsonConfigurationLoader;
 import org.spongepowered.configurate.serialize.TypeSerializerCollection;
 import reactor.core.publisher.Mono;
 
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 public final class CloudBotManager implements DcListener {
@@ -56,6 +61,7 @@ public final class CloudBotManager implements DcListener {
     private static final Logger LOGGER = LoggerFactory.getLogger("CloudBot");
 
     private static final String DISCORD_BASE_URL = System.getProperty("cloudbot.discord-base-url", Routes.BASE_URL);
+    private static final @Nullable String DISCORD_FORCED_SOCKET_URL = System.getProperty("cloudbot.discord-forced-socket-url");
 
     // <gray>[<gradient:#d4d4d4:#8fe3cd>CloudBot</gradient>]</gray><space>
     private static final Component PREFIX = Component.text()
@@ -79,6 +85,17 @@ public final class CloudBotManager implements DcListener {
             .withAllDefaultSerializers().withSerializers(SERIALIZERS).build();
     private static final ConfigurateLoader<?, ?> YAML_LOADER = ConfigurateLoader.yamlLoader()
             .withAllDefaultSerializers().withSerializers(SERIALIZERS).build();
+
+    private static final Field RESUME_URL_FIELD;
+
+    static {
+        try {
+            RESUME_URL_FIELD = DefaultGatewayClient.class.getDeclaredField("resumeUrl");
+            RESUME_URL_FIELD.setAccessible(true);
+        } catch (ReflectiveOperationException exception) {
+            throw new RuntimeException("Error while resolving hackfix reflection fields for no-ipv4 support", exception);
+        }
+    }
 
     private final TranslationManager i18n;
     private final Plugin plugin;
@@ -206,6 +223,23 @@ public final class CloudBotManager implements DcListener {
                             .and(this.reloadMainGuildData(gateway, null))
                             .doFinally(type -> LOGGER.info("Finished gateway bootstrapping: {}", type));
                 }));
+    }
+
+    @SuppressWarnings("unchecked")
+    @DcEventHandler
+    public Mono<Void> onReady(ReadyEvent event) throws IllegalAccessException {
+        if (DISCORD_FORCED_SOCKET_URL == null) {
+            return Mono.empty();
+        }
+
+        int shardId = event.getShardInfo().getIndex();
+        GatewayClient client = event.getClient().getGatewayClient(shardId).orElseThrow();
+        AtomicReference<String> resumeUrl = (AtomicReference<String>) RESUME_URL_FIELD.get(client);
+
+        String prevResumeUrl = resumeUrl.getAndSet(DISCORD_FORCED_SOCKET_URL);
+        LOGGER.info("Updated gateway resume url from {} to forced value {}",
+                prevResumeUrl, DISCORD_FORCED_SOCKET_URL);
+        return Mono.empty();
     }
 
     @DcEventHandler
