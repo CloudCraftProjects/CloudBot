@@ -33,7 +33,6 @@ public class LoginListener implements Listener {
         }
 
         UUID playerId = Objects.requireNonNull(event.getPlayerProfile().getId());
-        System.out.println(playerId);
         if (this.manager.getStorage().getWhitelist().containsKey(playerId)) {
             return; // java player is whitelisted, everything is fine
         }
