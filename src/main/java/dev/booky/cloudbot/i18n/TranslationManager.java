@@ -2,7 +2,6 @@ package dev.booky.cloudbot.i18n;
 // Created by booky10 in CloudBot (23:24 11.10.22)
 
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
-import net.kyori.adventure.util.UTF8ResourceBundleControl;
 import org.bukkit.plugin.Plugin;
 
 import java.text.AttributedCharacterIterator;
@@ -10,6 +9,8 @@ import java.text.MessageFormat;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.ResourceBundle;
+
+import static net.kyori.adventure.util.UTF8ResourceBundleControl.utf8ResourceBundleControl;
 
 public final class TranslationManager {
 
@@ -73,7 +74,7 @@ public final class TranslationManager {
 
     private void registerBundle(TranslationRegistry registry, Locale locale) {
         String baseName = this.plugin.getPluginMeta().getName().toLowerCase(Locale.ROOT);
-        ResourceBundle bundle = ResourceBundle.getBundle(baseName, locale, UTF8ResourceBundleControl.get());
+        ResourceBundle bundle = ResourceBundle.getBundle(baseName, locale, utf8ResourceBundleControl());
         registry.registerAll(locale, bundle, true);
     }
 

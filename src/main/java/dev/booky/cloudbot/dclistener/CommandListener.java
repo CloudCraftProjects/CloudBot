@@ -19,7 +19,6 @@ import dev.booky.cloudbot.events.DcListener;
 import dev.booky.cloudbot.events.custom.MainGuildDataReloadEvent;
 import dev.booky.cloudbot.i18n.Translator;
 import dev.booky.cloudbot.storage.CloudBotConfig;
-import dev.booky.cloudbot.util.ApplicationIdUtil;
 import dev.booky.cloudbot.util.CommandStringifier;
 import dev.booky.cloudbot.util.MarkdownEscape;
 import discord4j.common.util.Snowflake;
@@ -31,6 +30,8 @@ import discord4j.core.object.entity.User;
 import discord4j.core.object.entity.channel.GuildMessageChannel;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.discordjson.json.ApplicationCommandRequest;
+import discord4j.discordjson.json.ImmutableMessageReferenceData;
+import discord4j.discordjson.json.MessageReferenceData;
 import discord4j.rest.service.ApplicationService;
 import discord4j.rest.util.Color;
 import reactor.core.publisher.Mono;
@@ -172,6 +173,11 @@ public final class CommandListener implements DcListener {
                 stacktrace = stacktrace.substring(0, maxSize - 3 /*three dots*/) + "...";
             }
 
+            ImmutableMessageReferenceData.Builder ref = MessageReferenceData.builder();
+            msg.getGuildId().ifPresent(guild -> ref.guildId(guild.asLong()));
+            ref.channelId(msg.getChannelId().asLong());
+            ref.messageId(msg.getId().asLong());
+
             User user = event.getInteraction().getUser();
             logChannel.createMessage()
                     .withEmbeds(EmbedCreateSpec.builder()
@@ -180,7 +186,7 @@ public final class CommandListener implements DcListener {
                             .timestamp(Instant.now())
                             .footer(user.getTag(), user.getAvatarUrl())
                             .build())
-                    .withMessageReference(msg.getId())
+                    .withMessageReference(ref.build())
                     .subscribe();
         });
 

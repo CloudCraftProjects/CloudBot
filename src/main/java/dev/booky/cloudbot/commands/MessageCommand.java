@@ -19,10 +19,10 @@ import discord4j.core.object.component.ActionRow;
 import discord4j.core.object.component.Button;
 import discord4j.core.object.component.SelectMenu;
 import discord4j.core.object.component.TextInput;
+import discord4j.core.object.emoji.Emoji;
 import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.User;
 import discord4j.core.object.entity.channel.GuildMessageChannel;
-import discord4j.core.object.reaction.ReactionEmoji;
 import discord4j.core.spec.EmbedCreateFields;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.core.spec.InteractionPresentModalSpec;
@@ -139,10 +139,10 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
         SelectMenu selectMenu = SelectMenu.of(SELECTION_ID,
                         SelectMenu.Option.of(i18n.apply("command.message.selection.message.name"), SELECT_MESSAGE)
                                 .withDescription(i18n.apply("command.message.selection.message.desc"))
-                                .withEmoji(ReactionEmoji.unicode("\uD83D\uDCE7")),
+                                .withEmoji(Emoji.unicode("\uD83D\uDCE7")),
                         SelectMenu.Option.of(i18n.apply("command.message.selection.embed.name"), SELECT_EMBED)
                                 .withDescription(i18n.apply("command.message.selection.embed.desc"))
-                                .withEmoji(ReactionEmoji.unicode("\uD83D\uDCDC")))
+                                .withEmoji(Emoji.unicode("\uD83D\uDCDC")))
                 .withPlaceholder(i18n.apply("command.message.selection.hint"));
         return event.reply()
                 .withEphemeral(true)
@@ -150,17 +150,17 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
     }
 
     private Button getEditButton(Translator i18n) {
-        return Button.primary(EDIT_ID, ReactionEmoji.unicode("\u270F\uFE0F"),
+        return Button.primary(EDIT_ID, Emoji.unicode("\u270F\uFE0F"),
                 i18n.apply("command.message.edit"));
     }
 
     private Button getImportButton(Translator i18n) {
-        return Button.primary(IMPORT_ID, ReactionEmoji.unicode("\u2B07\uFE0F"),
+        return Button.primary(IMPORT_ID, Emoji.unicode("\u2B07\uFE0F"),
                 i18n.apply("command.message.import"));
     }
 
     private Button getSendButton(Translator i18n) {
-        return Button.success(SEND_ID, ReactionEmoji.unicode("\uD83D\uDCE8"),
+        return Button.success(SEND_ID, Emoji.unicode("\uD83D\uDCE8"),
                 i18n.apply("command.message.send"));
     }
 
@@ -212,7 +212,7 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
         }
 
         TextInput imageInput = TextInput.small(EE_IMAGE_ID,
-                i18n.apply("command.message.embed.image"))
+                        i18n.apply("command.message.embed.image"))
                 .required(false);
         if (embed.getImage().isPresent()) {
             String imageUrl = embed.getImage().map(Embed.Image::getUrl).orElseThrow();
@@ -283,7 +283,7 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                     modalSpec = this.createMessageEditModal(i18n, message);
                 } else {
                     // more complex embed creation modal
-                    Embed embed = message.getEmbeds().get(0);
+                    Embed embed = message.getEmbeds().getFirst();
                     modalSpec = this.createEmbedEditModal(i18n, message, embed);
                 }
 

@@ -1,18 +1,19 @@
 [versions]
 pluginyml = "0.6.0"
-runtask = "2.3.1"
-shadow = "8.3.3"
+runtask = "3.0.0"
+shadow = "8.3.9"
 
-minecraft = "1.21.1"
-paperapi = "1.21.1-R0.1-SNAPSHOT"
+minecraft = "1.21.9"
+paperapi = "1.21.9-R0.1-SNAPSHOT"
 
 cloudcore = "1.1.0-SNAPSHOT"
-configurate = "4.1.2"
+configurate = "4.2.0"
 bstats = "3.1.0"
 
-discord4j = "3.3.0-RC1"
+discord4j = "3.3.0-RC3"
 spark-api = "0.1-SNAPSHOT"
-floodgate = "2.2.3-SNAPSHOT"
+floodgate = "2.2.5-SNAPSHOT"
+luckperms = "5.5-SNAPSHOT"
 
 [plugins]
 pluginyml-paper = { id = "net.minecrell.plugin-yml.paper", version.ref = "pluginyml" }
@@ -29,3 +30,4 @@ cloudcore = { module = "dev.booky:cloudcore", version.ref = "cloudcore" }
 discord4j-core = { module = "com.discord4j:discord4j-core", version.ref = "discord4j" }
 spark-api = { module = "me.lucko:spark-api", version.ref = "spark-api" }
 floodgate-api = { module = "org.geysermc.floodgate:api", version.ref = "floodgate" }
+luckperms-api = { module = "net.luckperms:api", version.ref = "luckperms" }

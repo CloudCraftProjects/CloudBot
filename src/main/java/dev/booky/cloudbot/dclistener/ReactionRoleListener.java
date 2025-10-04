@@ -11,9 +11,10 @@ import discord4j.common.util.Snowflake;
 import discord4j.core.event.domain.message.ReactionAddEvent;
 import discord4j.core.event.domain.message.ReactionRemoveAllEvent;
 import discord4j.core.event.domain.message.ReactionRemoveEvent;
+import discord4j.core.object.emoji.Emoji;
+import discord4j.core.object.emoji.UnicodeEmoji;
 import discord4j.core.object.entity.Guild;
 import discord4j.core.object.reaction.Reaction;
-import discord4j.core.object.reaction.ReactionEmoji;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
@@ -35,7 +36,7 @@ public final class ReactionRoleListener implements DcListener {
                 mono = mono.and(entry.getKey().getMessage(mainGuild).flatMap(message -> {
                     Mono<Void> reactionMono = Mono.empty();
                     for (CloudBotConfig.ReactionRole role : entry.getValue()) {
-                        ReactionEmoji.Unicode emoji = ReactionEmoji.unicode(role.getEmoji());
+                        UnicodeEmoji emoji = Emoji.unicode(role.getEmoji());
                         if (message.getReactions().stream().map(Reaction::getEmoji).noneMatch(Predicate.isEqual(emoji))) {
                             reactionMono = reactionMono.and(message.addReaction(emoji).then());
                         }

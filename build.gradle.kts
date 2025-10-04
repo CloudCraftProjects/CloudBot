@@ -38,6 +38,7 @@ dependencies {
     // optional dependency
     compileOnlyApi(libs.spark.api)
     compileOnly(libs.floodgate.api)
+    compileOnly(libs.luckperms.api)
 
     // integrated metrics
     implementation(libs.bstats)
@@ -72,7 +73,7 @@ paper {
     main = "$group.cloudbot.CloudBotMain"
     loader = "$group.cloudbot.CloudBotLoader"
 
-    apiVersion = "1.20"
+    apiVersion = "1.21.7"
     authors = listOf("booky10")
     load = BukkitPluginDescription.PluginLoadOrder.POSTWORLD
 
@@ -85,6 +86,10 @@ paper {
             required = false
         }
         register("floodgate") {
+            load = PaperPluginDescription.RelativeLoadOrder.BEFORE
+            required = false
+        }
+        register("LuckPerms") {
             load = PaperPluginDescription.RelativeLoadOrder.BEFORE
             required = false
         }
