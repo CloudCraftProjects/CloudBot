@@ -1,13 +1,10 @@
 package dev.booky.cloudbot.listener;
 // Created by booky10 in CloudBot (17:39 12.10.22)
 
-import com.destroystokyo.paper.profile.PlayerProfile;
+import com.destroystokyo.paper.event.profile.ProfileWhitelistVerifyEvent;
 import dev.booky.cloudbot.CloudBotManager;
 import dev.booky.cloudbot.util.FloodgateUtil;
 import dev.booky.cloudbot.util.LuckPermsUtil;
-import io.papermc.paper.connection.PlayerConfigurationConnection;
-import io.papermc.paper.connection.PlayerLoginConnection;
-import io.papermc.paper.event.connection.PlayerConnectionValidateLoginEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.event.EventHandler;
@@ -20,8 +17,6 @@ import java.util.UUID;
 
 public class LoginListener implements Listener {
 
-    private static final UUID NULL_UUID = new UUID(0L, 0L);
-
     private final CloudBotManager manager;
 
     public LoginListener(CloudBotManager manager) {
@@ -29,26 +24,16 @@ public class LoginListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGH)
-    public void onLogin(PlayerConnectionValidateLoginEvent event) {
-        if (event.getKickMessage() != null) {
+    public void onWhitelistCheck(ProfileWhitelistVerifyEvent event) {
+        if (!event.isWhitelisted()) {
             return; // already kicked
         }
         if (!this.manager.getConfig().isWhitelistActive()) {
             return;
         }
 
-        UUID playerId = switch (event.getConnection()) {
-            case PlayerConfigurationConnection conn -> {
-                UUID uuid = conn.getProfile().getId();
-                yield Objects.requireNonNullElse(uuid, NULL_UUID);
-            }
-            case PlayerLoginConnection conn -> {
-                PlayerProfile prof = conn.getAuthenticatedProfile();
-                UUID uuid = prof == null ? NULL_UUID : prof.getId();
-                yield Objects.requireNonNullElse(uuid, NULL_UUID);
-            }
-            default -> NULL_UUID;
-        };
+        UUID playerId = Objects.requireNonNull(event.getPlayerProfile().getId());
+        System.out.println(playerId);
         if (this.manager.getStorage().getWhitelist().containsKey(playerId)) {
             return; // java player is whitelisted, everything is fine
         }
@@ -68,6 +53,7 @@ public class LoginListener implements Listener {
             message += "\nYou can join our discord using " + inviteLink + " for whitelisting yourself.";
         }
 
+        event.setWhitelisted(false);
         event.kickMessage(Component.text(message, NamedTextColor.RED));
     }
 }
