@@ -214,14 +214,15 @@ public final class WhitelistCommand extends AbstractBotCommand {
 
         try {
             Long xuid = FloodgateUtil.getXuid(gamertag).join();
+            String username = "`" + MarkdownEscape.codeEscape(gamertag) + "`";
             if (xuid == null) {
-                return event.reply(i18n.apply("command.whitelist.add.error.unknown-user",
-                        "`" + MarkdownEscape.codeEscape(gamertag) + "`"));
+                return event.reply(
+                        i18n.apply("command.whitelist.add.error.unknown-user", username) + "\n"
+                                + i18n.apply("command.whitelist.add.error.unknown-user.bedrock-note"));
             }
 
             if (this.manager.getStorage().getBedrockWhitelist().containsKey(xuid)) {
-                return event.reply(i18n.apply("command.whitelist.add.error.mc-already-whitelisted",
-                        "`" + MarkdownEscape.codeEscape(gamertag) + "`"));
+                return event.reply(i18n.apply("command.whitelist.add.error.mc-already-whitelisted", username));
             }
             if (this.manager.getStorage().getBedrockWhitelist().containsValue(user.getId().asLong())
                     || this.manager.getStorage().getWhitelist().containsValue(user.getId().asLong())) {
@@ -240,7 +241,7 @@ public final class WhitelistCommand extends AbstractBotCommand {
             return event.reply().withEmbeds(EmbedCreateSpec.builder()
                     .color(Color.GREEN).title(i18n.apply("command.whitelist.add.success.title"))
                     .description(i18n.apply("command.whitelist.add.success.description", user.getMention(),
-                            "`" + MarkdownEscape.codeEscape(gamertag) + "`"))
+                            username))
                     .footer(user.getTag(), user.getAvatarUrl())
                     .thumbnail("https://api.tydiumcraft.net/v1/players/skin?uuid=" + javaXuid + "&type=avatar&size=128")
                     .timestamp(Instant.now())
