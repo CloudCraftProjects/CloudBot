@@ -94,6 +94,8 @@ paper {
             required = false
         }
     }
+
+    foliaSupported = true
 }
 
 tasks {

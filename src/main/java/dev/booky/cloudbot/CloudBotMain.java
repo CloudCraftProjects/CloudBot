@@ -11,6 +11,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.TimeUnit;
+
 public final class CloudBotMain extends JavaPlugin {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("CloudBot");
@@ -39,7 +41,7 @@ public final class CloudBotMain extends JavaPlugin {
 
         Bukkit.getPluginManager().registerEvents(new LoginListener(this.manager), this);
 
-        Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+        Bukkit.getAsyncScheduler().runAtFixedRate(this, task -> {
             this.manager.saveStorages();
 
             // update presence
@@ -51,7 +53,7 @@ public final class CloudBotMain extends JavaPlugin {
                     gateway.updatePresence(this.manager.getConfig().buildPresence(shardInfo));
                 }
             }
-        }, 20, 30 * 20);
+        }, 1, 30, TimeUnit.SECONDS);
     }
 
     @Override

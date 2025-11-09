@@ -6,6 +6,7 @@ import org.spongepowered.configurate.objectmapping.ConfigSerializable;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @SuppressWarnings("FieldMayBeFinal") // configurate
 @ConfigSerializable
@@ -16,6 +17,11 @@ public class CloudBotStorage {
 
     @SuppressWarnings("unused") // configurate
     private CloudBotStorage() {
+    }
+
+    public void postLoad() {
+        this.whitelist = new ConcurrentHashMap<>(this.whitelist);
+        this.bedrockWhitelist = new ConcurrentHashMap<>(this.bedrockWhitelist);
     }
 
     public Map<UUID, Long> getWhitelist() {

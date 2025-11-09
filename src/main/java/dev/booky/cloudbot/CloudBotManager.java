@@ -156,6 +156,7 @@ public final class CloudBotManager implements DcListener {
             synchronized (this.diskLock) {
                 this.config = YAML_LOADER.loadObject(this.configPath, CloudBotConfig.class);
                 this.storage = GSON_LOADER.loadObject(this.storagePath, CloudBotStorage.class);
+                this.storage.postLoad();
                 this.i18n.reload();
             }
 

@@ -26,6 +26,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class ExecuteCommand extends AbstractBotCommand {
@@ -61,7 +62,7 @@ public final class ExecuteCommand extends AbstractBotCommand {
                 .orElseThrow();
 
         event.reply(i18n.apply("command.execute.executing")).withEphemeral(true).subscribe();
-        Bukkit.getScheduler().runTask(this.manager.getPlugin(), () -> {
+        Bukkit.getGlobalRegionScheduler().execute(this.manager.getPlugin(), () -> {
             List<String> feedback = new ArrayList<>();
             AtomicBoolean updating = new AtomicBoolean();
 
@@ -82,7 +83,7 @@ public final class ExecuteCommand extends AbstractBotCommand {
                 }
 
                 if (updating.compareAndSet(false, true)) {
-                    Bukkit.getScheduler().runTaskLaterAsynchronously(this.manager.getPlugin(), () -> {
+                    Bukkit.getAsyncScheduler().runDelayed(this.manager.getPlugin(), task -> {
                         String content;
                         synchronized (feedback) {
                             content = String.join("\n", feedback);
@@ -90,7 +91,7 @@ public final class ExecuteCommand extends AbstractBotCommand {
                         updating.set(false);
 
                         event.editReply("```ansi\n" + content + "\n```").block();
-                    }, 20);
+                    }, 1, TimeUnit.SECONDS);
                 }
             });
             Bukkit.dispatchCommand(sender[0], command);
