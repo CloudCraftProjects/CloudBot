@@ -17,6 +17,7 @@ import discord4j.core.object.command.ApplicationCommandInteractionOptionValue;
 import discord4j.core.object.command.ApplicationCommandOption;
 import discord4j.core.object.component.ActionRow;
 import discord4j.core.object.component.Button;
+import discord4j.core.object.component.Label;
 import discord4j.core.object.component.SelectMenu;
 import discord4j.core.object.component.TextInput;
 import discord4j.core.object.emoji.Emoji;
@@ -184,43 +185,37 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
         return InteractionPresentModalSpec.builder()
                 .title(i18n.apply("command.message.message.modal-title"))
                 .customId(EDIT_MESSAGE_ID)
-                .addComponent(ActionRow.of(TextInput.paragraph(EM_CONTENT_ID,
-                                i18n.apply("command.message.message.content"),
-                                1, 2048)
-                        .prefilled(message.getContent())
-                        .required(true)))
+                .addComponent(Label.of(
+                        i18n.apply("command.message.message.content"),
+                        TextInput.paragraph(EM_CONTENT_ID, 1, 2048)
+                                .prefilled(message.getContent())
+                                .required(true)
+                ))
                 .build();
     }
 
     public InteractionPresentModalSpec createEmbedEditModal(Translator i18n, Message message, Embed embed) {
-        TextInput titleInput = TextInput.small(EE_TITLE_ID,
-                        i18n.apply("command.message.embed.title"),
-                        0, 128)
+        TextInput titleInput = TextInput.small(EE_TITLE_ID, 0, 128)
                 .required(false)
                 .prefilled("");
         if (embed.getTitle().isPresent()) {
             titleInput = titleInput.prefilled(embed.getTitle().get());
         }
 
-        TextInput contentInput = TextInput.paragraph(EE_DESCRIPTION_ID,
-                        i18n.apply("command.message.embed.description"),
-                        1, 4000)
+        TextInput contentInput = TextInput.paragraph(EE_DESCRIPTION_ID, 1, 4000)
                 .required(true)
                 .prefilled(i18n.apply("command.message.no-content"));
         if (embed.getDescription().isPresent()) {
             contentInput = contentInput.prefilled(embed.getDescription().get());
         }
 
-        TextInput imageInput = TextInput.small(EE_IMAGE_ID,
-                        i18n.apply("command.message.embed.image"))
-                .required(false);
+        TextInput imageInput = TextInput.small(EE_IMAGE_ID).required(false);
         if (embed.getImage().isPresent()) {
             String imageUrl = embed.getImage().map(Embed.Image::getUrl).orElseThrow();
             imageInput = imageInput.prefilled(imageUrl);
         }
 
         TextInput colorInput = TextInput.small(EE_COLOR_ID,
-                        i18n.apply("command.message.embed.color"),
                         1 + 3, 1 + 6)
                 .required(true)
                 .prefilled("#27292E");
@@ -232,15 +227,15 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
         return InteractionPresentModalSpec.builder()
                 .title(i18n.apply("command.message.embed.modal-title"))
                 .customId(EDIT_EMBED_ID)
-                .addComponent(ActionRow.of(TextInput.paragraph(EE_MSG_CONTENT_ID,
-                                i18n.apply("command.message.embed.msg-content"),
-                                0, 2048)
-                        .required(false)
-                        .prefilled(message.getContent())))
-                .addComponent(ActionRow.of(titleInput))
-                .addComponent(ActionRow.of(contentInput))
-                .addComponent(ActionRow.of(imageInput))
-                .addComponent(ActionRow.of(colorInput))
+                .addComponent(Label.of(
+                        i18n.apply("command.message.embed.msg-content"),
+                        TextInput.paragraph(EE_MSG_CONTENT_ID, 0, 2048)
+                                .prefilled(message.getContent()).required(false)
+                ))
+                .addComponent(Label.of(i18n.apply("command.message.embed.title"), titleInput))
+                .addComponent(Label.of(i18n.apply("command.message.embed.description"), contentInput))
+                .addComponent(Label.of(i18n.apply("command.message.embed.image"), imageInput))
+                .addComponent(Label.of(i18n.apply("command.message.embed.color"), colorInput))
                 .build();
     }
 
@@ -248,12 +243,14 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
         return InteractionPresentModalSpec.builder()
                 .title(i18n.apply("command.message.import.modal-title"))
                 .customId(IMPORT_ID)
-                .addComponent(ActionRow.of(TextInput.small(CHANNEL_ID,
-                                i18n.apply("command.message.import.channel-id"))
-                        .required(false)))
-                .addComponent(ActionRow.of(TextInput.small(MESSAGE_ID,
-                                i18n.apply("command.message.import.message-id"))
-                        .required(true)))
+                .addComponent(Label.of(
+                        i18n.apply("command.message.import.channel-id"),
+                        TextInput.small(CHANNEL_ID).required(false)
+                ))
+                .addComponent(Label.of(
+                        i18n.apply("command.message.import.message-id"),
+                        TextInput.small(MESSAGE_ID).required(true)
+                ))
                 .build();
     }
 
@@ -261,12 +258,14 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
         return InteractionPresentModalSpec.builder()
                 .title(i18n.apply("command.message.send.modal-title"))
                 .customId(SEND_ID)
-                .addComponent(ActionRow.of(TextInput.small(CHANNEL_ID,
-                                i18n.apply("command.message.send.channel-id"))
-                        .required(false)))
-                .addComponent(ActionRow.of(TextInput.small(MESSAGE_ID,
-                                i18n.apply("command.message.send.message-id"))
-                        .required(false)))
+                .addComponent(Label.of(
+                        i18n.apply("command.message.send.channel-id"),
+                        TextInput.small(CHANNEL_ID).required(false)
+                ))
+                .addComponent(Label.of(
+                        i18n.apply("command.message.send.message-id"),
+                        TextInput.small(MESSAGE_ID).required(false)
+                ))
                 .build();
     }
 

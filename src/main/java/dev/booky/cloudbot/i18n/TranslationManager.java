@@ -10,8 +10,6 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.ResourceBundle;
 
-import static net.kyori.adventure.util.UTF8ResourceBundleControl.utf8ResourceBundleControl;
-
 public final class TranslationManager {
 
     private final Plugin plugin;
@@ -74,7 +72,7 @@ public final class TranslationManager {
 
     private void registerBundle(TranslationRegistry registry, Locale locale) {
         String baseName = this.plugin.getPluginMeta().getName().toLowerCase(Locale.ROOT);
-        ResourceBundle bundle = ResourceBundle.getBundle(baseName, locale, utf8ResourceBundleControl());
+        ResourceBundle bundle = ResourceBundle.getBundle(baseName, locale);
         registry.registerAll(locale, bundle, true);
     }
 

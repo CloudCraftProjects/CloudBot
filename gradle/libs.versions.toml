@@ -10,7 +10,7 @@ cloudcore = "1.1.0-SNAPSHOT"
 configurate = "4.2.0"
 bstats = "3.1.0"
 
-discord4j = "3.3.0-RC3"
+discord4j = "3.3.3"
 spark-api = "0.1-SNAPSHOT"
 floodgate = "2.2.5-SNAPSHOT"
 luckperms = "5.5-SNAPSHOT"
