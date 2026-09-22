@@ -20,9 +20,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import reactor.core.publisher.Mono;
 
-import java.text.SimpleDateFormat;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class ExecuteCommand extends AbstractBotCommand {
 
-    private static final SimpleDateFormat LOG_PREFIX = new SimpleDateFormat("HH:mm:ss");
+    private static final DateTimeFormatter LOG_PREFIX = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     public ExecuteCommand(CloudBotManager manager) {
         super(manager, "execute");
@@ -72,7 +72,7 @@ public final class ExecuteCommand extends AbstractBotCommand {
                 String ansiMessage = DiscordComponentRenderer.render(translatedMessage);
 
                 String[] lines = StringUtils.split(ansiMessage, '\n');
-                String currentTime = "[" + LOG_PREFIX.format(new Date()) + "] ";
+                String currentTime = "[" + LOG_PREFIX.format(LocalTime.now()) + "] ";
 
                 for (String line : lines) {
                     // nobody will know
