@@ -310,12 +310,7 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
     }
 
     public Map<String, Optional<String>> extractInputs(ModalSubmitInteractionEvent event) {
-        return event.getComponents().stream()
-                .filter(component -> component instanceof ActionRow)
-                .map(component -> (ActionRow) component)
-                .flatMap(row -> row.getChildren().stream())
-                .filter(child -> child instanceof TextInput)
-                .map(child -> (TextInput) child)
+        return event.getComponents(TextInput.class).stream()
                 .collect(Collectors.toUnmodifiableMap(
                         TextInput::getCustomId, TextInput::getValue));
     }
@@ -350,7 +345,7 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
         Message message = event.getMessage().orElseThrow();
         return Mono.fromSupplier(() -> this.extractInputs(event))
                 .flatMap(inputs -> {
-                    Optional<String> content = inputs.get(EM_CONTENT_ID);
+                    Optional<String> content = inputs.getOrDefault(EM_CONTENT_ID, Optional.empty());
                     return message.edit().withContentOrNull(content.orElse(null));
                 })
                 .then();
