@@ -17,6 +17,7 @@ import discord4j.core.object.command.ApplicationCommandInteractionOptionValue;
 import discord4j.core.object.command.ApplicationCommandOption;
 import discord4j.core.object.component.ActionRow;
 import discord4j.core.object.component.Button;
+import discord4j.core.object.component.CheckboxAction;
 import discord4j.core.object.component.Label;
 import discord4j.core.object.component.SelectMenu;
 import discord4j.core.object.component.TextInput;
@@ -32,6 +33,7 @@ import discord4j.core.spec.MessageEditMono;
 import discord4j.discordjson.json.ApplicationCommandOptionChoiceData;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ImmutableApplicationCommandRequest;
+import discord4j.rest.util.AllowedMentions;
 import discord4j.rest.util.Color;
 import discord4j.rest.util.Permission;
 import discord4j.rest.util.PermissionSet;
@@ -69,6 +71,7 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
 
     private static final String CHANNEL_ID = "channel";
     private static final String MESSAGE_ID = "message";
+    private static final String MENTION_ID = "mentions";
 
     public MessageCommand(CloudBotManager manager) {
         super(manager, "message");
@@ -266,6 +269,11 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                         i18n.apply("command.message.send.message-id"),
                         TextInput.small(MESSAGE_ID).required(false)
                 ))
+                .addComponent(Label.of(
+                        i18n.apply("command.message.send.mentions"),
+                        i18n.apply("command.message.send.mentions.desc"),
+                        CheckboxAction.of(MENTION_ID)
+                ))
                 .build();
     }
 
@@ -403,8 +411,17 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                 .map(Long::parseLong);
     }
 
+    private boolean extractMentionInput(ModalSubmitInteractionEvent event) {
+        return event.getComponents(CheckboxAction.class).stream()
+                .filter(component -> MENTION_ID.equals(component.getCustomId()))
+                .findFirst()
+                .flatMap(CheckboxAction::getValue)
+                .orElse(false);
+    }
+
     public Mono<Void> submitSend(ModalSubmitInteractionEvent event) {
         Message message = event.getMessage().orElseThrow();
+        boolean allowMentions = this.extractMentionInput(event);
         return Mono.fromSupplier(() -> this.extractMessageRefInputs(event))
                 .flatMap(inputs -> message.getGuild()
                         .flatMap(guild -> guild.getChannelById(Snowflake.of(inputs.getKey())))
@@ -415,6 +432,10 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                                 MessageCreateMono creator = channel.createMessage();
                                 if (!StringUtils.isBlank(message.getContent())) {
                                     creator = creator.withContent(message.getContent());
+                                }
+                                if (allowMentions) {
+                                    // we suppress everything by default, so explicitly allow non-everyone mentions
+                                    creator = creator.withAllowedMentions(AllowedMentions.suppressEveryone());
                                 }
                                 return creator.withEmbeds(message.getEmbeds().stream()
                                                 .map(this::toCreateSpec).toList())
@@ -428,6 +449,10 @@ public final class MessageCommand extends AbstractBotCommand implements DcListen
                                             editor = editor.withContentOrNull(message.getContent());
                                         } else {
                                             editor = editor.withContentOrNull(null);
+                                        }
+                                        if (allowMentions) {
+                                            // we suppress everything by default, so explicitly allow non-everyone mentions
+                                            editor = editor.withAllowedMentionsOrNull(AllowedMentions.suppressEveryone());
                                         }
                                         return editor.withEmbedsOrNull(message.getEmbeds().stream()
                                                 .map(this::toCreateSpec).toList());
